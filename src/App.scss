@@ -1,34 +1,92 @@
 @import "../node_modules/flag-icons/css/flag-icons.min.css";
 
+@keyframes shake {
+  0% {
+    margin-left: 0rem;
+  }
+  25% {
+    margin-left: 0.5rem;
+  }
+  75% {
+    margin-left: -0.5rem;
+  }
+  100% {
+    margin-left: 0rem;
+  }
+}
+
+@keyframes fadein {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 body {
-    background-color: #0f111a;
-    color: white;
+  background-color: #0f111a;
+  color: white;
+}
+
+input:focus,
+select:focus,
+textarea:focus,
+button:focus {
+  outline: none;
 }
 
 main {
+  animation: fadein 2s;
 
-    height: 100vh;
-    display: grid;
-    place-items: center;
+  height: 100vh;
+  display: grid;
+  place-items: center;
 
-    .flag-container {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
+  .flag-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 
-        .big-flag {
-            margin: 1rem;
+    .flag-score {
+      transition: 0.5s;
 
-            width: 100%;
-            height: 20vh;
-
-            filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.8));
-        }
-
-        input {
-            margin: 1rem;
-            width: 100%;
-            height: 2rem;
-        }
+      &.success {
+        transition: 0.5s;
+        text-shadow: 0 0 20px #fff, 0 0 30px green, 0 0 40px green,
+          0 0 50px green, 0 0 60px green, 0 0 70px green, 0 0 80px green;
+      }
     }
+
+    .big-flag {
+      transition: 1s;
+      margin: 1rem;
+
+      width: 100%;
+      height: 20vh;
+
+      filter: drop-shadow(0 0 2rem rgba(255, 255, 255, 0.8));
+    }
+
+    input {
+      margin: 1rem;
+      width: 100%;
+      height: 2rem;
+      transition: 0.5s;
+
+      &:focus {
+        box-shadow: 0 0 1rem white;
+      }
+
+      &.error {
+        animation: shake 0.2s ease-in-out 0s 2;
+        box-shadow: 0 0 2rem red;
+      }
+
+      &.success {
+        transition: 0.5s;
+        box-shadow: 0 0 2rem green;
+      }
+    }
+  }
 }
