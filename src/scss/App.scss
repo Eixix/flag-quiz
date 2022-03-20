@@ -1,4 +1,4 @@
-@import "../node_modules/flag-icons/css/flag-icons.min.css";
+@import "../../node_modules/flag-icons/css/flag-icons.min.css";
 
 @keyframes shake {
   0% {
@@ -29,6 +29,29 @@ body {
   color: white;
 }
 
+input {
+  margin: 1rem 0;
+  width: 100%;
+  height: 2rem;
+  transition: 0.5s;
+}
+
+button {
+  padding: 1em 2em;
+  appearance: none;
+  background-color: #ff0081;
+  color: white;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  transition: transform ease-in 0.1s, box-shadow ease-in 0.25s;
+  box-shadow: 0 2px 25px rgba(255, 0, 130, 0.5);
+
+  &:disabled {
+    background-color: grey;
+  }
+}
+
 input:focus,
 select:focus,
 textarea:focus,
@@ -39,14 +62,27 @@ button:focus {
 main {
   animation: fadein 2s;
 
-  height: 100vh;
+  height: 80vh;
+
   display: grid;
   place-items: center;
+
+  .login-container,
+  .connection-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
 
   .flag-container {
     display: flex;
     flex-direction: column;
     align-items: center;
+
+    .score-container {
+      display: flex;
+      justify-content: space-between;
+    }
 
     .flag-score {
       transition: 0.5s;
@@ -69,11 +105,6 @@ main {
     }
 
     input {
-      margin: 1rem;
-      width: 100%;
-      height: 2rem;
-      transition: 0.5s;
-
       &:focus {
         box-shadow: 0 0 1rem white;
       }
@@ -88,5 +119,12 @@ main {
         box-shadow: 0 0 2rem green;
       }
     }
+  }
+}
+
+@media only screen and (max-width: 999px) {
+  main {
+    display: flex;
+    flex-direction: column;
   }
 }
