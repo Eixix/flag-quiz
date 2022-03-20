@@ -1,9 +1,9 @@
-import './App.scss';
-import FlagGuesser from './components/flagGuesser';
+import './scss/App.scss';
+import PeerValidator from './components/peerValidator';
 
 function App() {
     return (
-        <main><FlagGuesser /></main>
+        <main><PeerValidator /></main>
     );
 }
 

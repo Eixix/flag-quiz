@@ -1,4 +1,4 @@
-@import "../node_modules/flag-icons/css/flag-icons.min.css";
+@import "../../node_modules/flag-icons/css/flag-icons.min.css";
 
 @keyframes shake {
   0% {
@@ -39,7 +39,8 @@ button:focus {
 main {
   animation: fadein 2s;
 
-  height: 100vh;
+  height: 80vh;
+
   display: grid;
   place-items: center;
 
@@ -88,5 +89,12 @@ main {
         box-shadow: 0 0 2rem green;
       }
     }
+  }
+}
+
+@media only screen and (max-width: 999px) {
+  main {
+    display: flex;
+    flex-direction: column;
   }
 }
