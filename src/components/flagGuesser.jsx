@@ -11,8 +11,20 @@ export default class FlagGuesser extends Component {
       countryCode,
       countryName,
       score: 0,
+      enemyScore: 0,
       inputValue: "",
+      peer: this.props.peer,
+      connection: this.props.connection,
     };
+
+    this.state.connection.on(
+      "data",
+      function (data) {
+        this.setState((prevState) => ({
+          enemyScore: prevState.enemyScore + 1,
+        }));
+      }.bind(this)
+    );
   }
 
   randomCountry() {
@@ -24,7 +36,7 @@ export default class FlagGuesser extends Component {
   }
 
   validateInput(event) {
-    const inputValue = event.target.value.toLowerCase();
+    const inputValue = event.target.value.toLowerCase().trim();
     const stateValue = this.state.countryName.toLowerCase();
     this.setState({ inputValue });
 
@@ -40,6 +52,7 @@ export default class FlagGuesser extends Component {
       this.setState({ countryCode, countryName });
 
       setTimeout(() => this.setState({ success: false }), 2000);
+      this.state.connection.send("Got one");
     } else if (
       Levenshtein.get(inputValue, stateValue) > 6 &&
       inputValue.length > 7
@@ -56,7 +69,10 @@ export default class FlagGuesser extends Component {
     return (
       <div className='flag-container'>
         <h1 className={"flag-score " + (this.state.success ? "success" : "")}>
-          {this.state.score}
+          {this.props.ownName}: {this.state.score}
+        </h1>
+        <h1>
+          {this.props.targetName}: {this.state.enemyScore}
         </h1>
         <h1>Which country is this?</h1>
         <span className={"big-flag fi fi-" + this.state.countryCode}></span>
