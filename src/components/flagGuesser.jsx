@@ -53,7 +53,7 @@ export default class FlagGuesser extends Component {
     const stateValue = this.state.countryName.toLowerCase();
     this.setState({ inputValue });
 
-    if (stateValue === inputValue.trim()) {
+    if (Levenshtein.get(inputValue.trim(), stateValue.trim()) < 2) {
       this.setState({ error: false });
       this.setState({ success: true });
       this.setState((prevState) => ({
@@ -68,7 +68,7 @@ export default class FlagGuesser extends Component {
       this.state.connection.send("Got one");
     } else if (
       Levenshtein.get(inputValue, stateValue) > 6 &&
-      inputValue.length > 7
+      !stateValue.includes(inputValue)
     ) {
       this.setState({ success: false });
       this.setState({ error: true });
