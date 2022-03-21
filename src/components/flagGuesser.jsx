@@ -102,7 +102,7 @@ export default class FlagGuesser extends Component {
           disabled={this.state.skips <= 0 ? true : undefined}
           onClick={this.skipCountry.bind(this)}
         >
-          Skip
+          Skip ({this.state.skips} left)
         </button>
       </div>
     );
