@@ -60,8 +60,13 @@ export default class FlagGuesser extends Component {
     const stateValue = this.state.countryNames.map(name => name.toLowerCase());
     this.setState({ inputValue });
 
-    mappedStateValues = stateValue.map(countryName => {distance: Levenshtein.get(inputValue.trim(), countryName.trim()), name: countryName.trim()});
-    if (mappedStateValues.reduce((prev, curr) => prev || curr.distance < 2 && curr.name == inputValue.trim().length, false)) {
+    const mappedStateValues = stateValue.map(countryName => {
+      return {
+        distance: Levenshtein.get(inputValue.trim(), countryName.trim()),
+        countryName: countryName.trim()
+      };
+    });
+    if (mappedStateValues.reduce((prev, curr) => prev || (curr.distance < 2 && curr.countryName.length == inputValue.trim().length), false)) {
       this.setState({ error: false });
       this.setState({ success: true });
       this.setState((prevState) => ({
@@ -82,7 +87,7 @@ export default class FlagGuesser extends Component {
         setTimeout(() => this.setState({ success: false }), 2000);
         this.state.connection.send("+1");
       }
-    } else if (mappedStateValues.reduce((prev, curr) => prev || curr.distance > 6 && !curr.name.includes(inputValue.trim()), false)) {
+    } else if (mappedStateValues.reduce((prev, curr) => prev || (curr.distance > 6 && !curr.countryName.includes(inputValue.trim())), false)) {
       this.setState({ success: false });
       this.setState({ error: true });
     } else {
