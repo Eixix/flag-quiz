@@ -6,10 +6,10 @@ export default class FlagGuesser extends Component {
   constructor(props) {
     super(props);
 
-    const [countryCode, countryName] = this.randomCountry();
+    const [countryCode, countryNames] = this.randomCountry();
     this.state = {
       countryCode,
-      countryName,
+      countryNames,
       score: 0,
       enemyScore: 0,
       inputValue: "",
@@ -32,8 +32,8 @@ export default class FlagGuesser extends Component {
     const keys = Object.keys(Countries);
     const random = (keys.length * Math.random()) << 0;
     const countryCode = keys[random];
-    const countryName = Countries[countryCode];
-    return [countryCode.toLowerCase(), countryName];
+    const countryNames = Countries[countryCode];
+    return [countryCode.toLowerCase(), countryNames];
   }
 
   skipCountry() {
@@ -43,17 +43,17 @@ export default class FlagGuesser extends Component {
       }));
 
       this.setState({ inputValue: "" });
-      const [countryCode, countryName] = this.randomCountry();
-      this.setState({ countryCode, countryName });
+      const [countryCode, countryNames] = this.randomCountry();
+      this.setState({ countryCode, countryNames });
     }
   }
 
   validateInput(event) {
     const inputValue = event.target.value.toLowerCase();
-    const stateValue = this.state.countryName.toLowerCase();
+    const stateValue = this.state.countryNames.map(name => name.toLowerCase());
     this.setState({ inputValue });
 
-    if (stateValue === inputValue.trim()) {
+    if (stateValue.find(countryName => countryName === inputValue)) {
       this.setState({ error: false });
       this.setState({ success: true });
       this.setState((prevState) => ({
@@ -61,13 +61,13 @@ export default class FlagGuesser extends Component {
       }));
 
       this.setState({ inputValue: "" });
-      const [countryCode, countryName] = this.randomCountry();
-      this.setState({ countryCode, countryName });
+      const [countryCode, countryNames] = this.randomCountry();
+      this.setState({ countryCode, countryNames });
 
       setTimeout(() => this.setState({ success: false }), 2000);
       this.state.connection.send("Got one");
     } else if (
-      Levenshtein.get(inputValue, stateValue) > 6 &&
+      stateValue.map(countryName => Levenshtein.get(inputValue, countryName)).reduce((prev, curr) => Math.min(prev, curr), Number.MAX_SAFE_INTEGER) > 6 &&
       inputValue.length > 7
     ) {
       this.setState({ success: false });
