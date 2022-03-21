@@ -15,6 +15,7 @@ export default class FlagGuesser extends Component {
       inputValue: "",
       peer: this.props.peer,
       connection: this.props.connection,
+      skips: 3,
     };
 
     this.state.connection.on(
@@ -33,6 +34,18 @@ export default class FlagGuesser extends Component {
     const countryCode = keys[random];
     const countryName = Countries[countryCode];
     return [countryCode.toLowerCase(), countryName];
+  }
+
+  skipCountry() {
+    if (this.state.skips > 0) {
+      this.setState((prevState) => ({
+        skips: prevState.skips - 1,
+      }));
+
+      this.setState({ inputValue: "" });
+      const [countryCode, countryName] = this.randomCountry();
+      this.setState({ countryCode, countryName });
+    }
   }
 
   validateInput(event) {
@@ -85,6 +98,12 @@ export default class FlagGuesser extends Component {
           type='text'
           onChange={this.validateInput.bind(this)}
         />
+        <button
+          disabled={this.state.skips <= 0 ? true : undefined}
+          onClick={this.skipCountry.bind(this)}
+        >
+          Skip ({this.state.skips} left)
+        </button>
       </div>
     );
   }
