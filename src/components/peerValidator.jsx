@@ -54,6 +54,7 @@ export default class PeerValidator extends Component {
           <h2>Input user name:</h2>
           <input
             type='text'
+            key={1}
             className='login-input'
             onChange={(e) => this.setState({ ownName: e.target.value.trim() })}
           />
@@ -66,6 +67,7 @@ export default class PeerValidator extends Component {
           <h2>{this.state.loading ? "LOADING..." : this.state.ownName}</h2>
           <input
             type='text'
+            key={2}
             className='connection-input'
             onChange={(e) =>
               this.setState({ targetName: e.target.value.trim() })
