@@ -36,11 +36,11 @@ export default class FlagGuesser extends Component {
   }
 
   validateInput(event) {
-    const inputValue = event.target.value.toLowerCase().trim();
+    const inputValue = event.target.value.toLowerCase();
     const stateValue = this.state.countryName.toLowerCase();
     this.setState({ inputValue });
 
-    if (stateValue === inputValue) {
+    if (stateValue === inputValue.trim()) {
       this.setState({ error: false });
       this.setState({ success: true });
       this.setState((prevState) => ({
@@ -68,13 +68,13 @@ export default class FlagGuesser extends Component {
   render() {
     return (
       <div className='flag-container'>
-        <h1 className={"flag-score " + (this.state.success ? "success" : "")}>
-          {this.props.ownName}: {this.state.score}
-        </h1>
-        <h1>
+        <h2 className={"flag-score " + (this.state.success ? "success" : "")}>
+          {this.props.ownName}: {this.state.score}{" "}
+        </h2>
+        <h2>
           {this.props.targetName}: {this.state.enemyScore}
-        </h1>
-        <h1>Which country is this?</h1>
+        </h2>
+        <h2>Which country is this?</h2>
         <span className={"big-flag fi fi-" + this.state.countryCode}></span>
         <input
           className={

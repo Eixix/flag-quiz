@@ -79,6 +79,10 @@ main {
     flex-direction: column;
     align-items: center;
 
+    h2 {
+      margin: 0;
+    }
+
     .score-container {
       display: flex;
       justify-content: space-between;
