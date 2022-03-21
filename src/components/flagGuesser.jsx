@@ -1,6 +1,7 @@
 import React, { Component } from "react";
 import Countries from "../res/ISO3166-1.alpha2_en.json";
 import Levenshtein from "fast-levenshtein";
+import party from "party-js";
 
 export default class FlagGuesser extends Component {
   constructor(props) {
@@ -16,14 +17,20 @@ export default class FlagGuesser extends Component {
       peer: this.props.peer,
       connection: this.props.connection,
       skips: 3,
+      goalScore: 10,
+      won: undefined,
     };
 
     this.state.connection.on(
       "data",
       function (data) {
-        this.setState((prevState) => ({
-          enemyScore: prevState.enemyScore + 1,
-        }));
+        if (data === "won") {
+          this.setState({ won: false });
+        } else {
+          this.setState((prevState) => ({
+            enemyScore: prevState.enemyScore + 1,
+          }));
+        }
       }.bind(this)
     );
   }
@@ -53,7 +60,10 @@ export default class FlagGuesser extends Component {
     const stateValue = this.state.countryName.toLowerCase();
     this.setState({ inputValue });
 
-    if (Levenshtein.get(inputValue.trim(), stateValue.trim()) < 2) {
+    if (
+      Levenshtein.get(inputValue.trim(), stateValue.trim()) < 2 &&
+      inputValue.trim().length == stateValue.trim().length
+    ) {
       this.setState({ error: false });
       this.setState({ success: true });
       this.setState((prevState) => ({
@@ -64,8 +74,16 @@ export default class FlagGuesser extends Component {
       const [countryCode, countryName] = this.randomCountry();
       this.setState({ countryCode, countryName });
 
-      setTimeout(() => this.setState({ success: false }), 2000);
-      this.state.connection.send("Got one");
+      if (this.state.score >= this.state.goalScore - 1) {
+        this.state.connection.send("won");
+        this.setState({ won: true });
+        party.confetti(document.body, {
+          count: party.variation.range(100, 250),
+        });
+      } else {
+        setTimeout(() => this.setState({ success: false }), 2000);
+        this.state.connection.send("+1");
+      }
     } else if (
       Levenshtein.get(inputValue, stateValue) > 6 &&
       !stateValue.includes(inputValue)
@@ -79,32 +97,40 @@ export default class FlagGuesser extends Component {
   }
 
   render() {
-    return (
-      <div className='flag-container'>
-        <h2 className={"flag-score " + (this.state.success ? "success" : "")}>
-          {this.props.ownName}: {this.state.score}{" "}
-        </h2>
-        <h2>
-          {this.props.targetName}: {this.state.enemyScore}
-        </h2>
-        <h2>Which country is this?</h2>
-        <span className={"big-flag fi fi-" + this.state.countryCode}></span>
-        <input
-          className={
-            this.state.error ? "error" : this.state.success ? "success" : ""
-          }
-          autoFocus
-          value={this.state.inputValue}
-          type='text'
-          onChange={this.validateInput.bind(this)}
-        />
-        <button
-          disabled={this.state.skips <= 0 ? true : undefined}
-          onClick={this.skipCountry.bind(this)}
-        >
-          Skip ({this.state.skips} left)
-        </button>
-      </div>
-    );
+    if (this.state.won === undefined) {
+      return (
+        <div className='flag-container'>
+          <h2 className={"flag-score " + (this.state.success ? "success" : "")}>
+            {this.props.ownName}: {this.state.score}{" "}
+          </h2>
+          <h2>
+            {this.props.targetName}: {this.state.enemyScore}
+          </h2>
+          <h2>Which country is this?</h2>
+          <span className={"big-flag fi fi-" + this.state.countryCode}></span>
+          <input
+            className={
+              this.state.error ? "error" : this.state.success ? "success" : ""
+            }
+            autoFocus
+            value={this.state.inputValue}
+            type='text'
+            onChange={this.validateInput.bind(this)}
+          />
+          <button
+            disabled={this.state.skips <= 0 ? true : undefined}
+            onClick={this.skipCountry.bind(this)}
+          >
+            Skip ({this.state.skips} left)
+          </button>
+        </div>
+      );
+    } else {
+      return (
+        <div className='flag-container'>
+          <h1>{this.state.won ? "YOU WON!" : "YOU LOST!"}</h1>
+        </div>
+      );
+    }
   }
 }
