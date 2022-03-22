@@ -84,8 +84,8 @@ export default class FlagGuesser extends Component {
           count: party.variation.range(100, 250),
         });
       } else {
-        setTimeout(() => this.setState({ success: false }), 2000);
         this.state.connection.send("+1");
+        setTimeout(() => this.setState({ success: false }), 2000);
       }
     } else if (mappedStateValues.reduce((prev, curr) => prev || (curr.distance > 6 && !curr.countryName.includes(inputValue.trim())), false)) {
       this.setState({ success: false });
