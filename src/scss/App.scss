@@ -29,14 +29,15 @@ body {
   color: white;
 }
 
-input {
+input[type="text"] {
   margin: 1rem 0;
   width: 100%;
   height: 2rem;
   transition: 0.5s;
 }
 
-button {
+button,
+input[type="submit"] {
   padding: 1em 2em;
   appearance: none;
   background-color: #ff0081;
@@ -49,6 +50,7 @@ button {
 
   &:disabled {
     background-color: grey;
+    box-shadow: 0 2px 25px grey;
   }
 }
 
@@ -108,7 +110,7 @@ main {
       filter: drop-shadow(0 0 2rem rgba(255, 255, 255, 0.8));
     }
 
-    input {
+    input[type="text"] {
       &:focus {
         box-shadow: 0 0 1rem white;
       }

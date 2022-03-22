@@ -62,7 +62,7 @@ export default class FlagGuesser extends Component {
 
     if (
       Levenshtein.get(inputValue.trim(), stateValue.trim()) < 2 &&
-      inputValue.trim().length == stateValue.trim().length
+      inputValue.trim().length === stateValue.trim().length
     ) {
       this.setState({ error: false });
       this.setState({ success: true });
@@ -96,6 +96,10 @@ export default class FlagGuesser extends Component {
     }
   }
 
+  playAgain() {
+    this.props.connectionState({ connected: false });
+  }
+
   render() {
     if (this.state.won === undefined) {
       return (
@@ -116,6 +120,7 @@ export default class FlagGuesser extends Component {
             value={this.state.inputValue}
             type='text'
             onChange={this.validateInput.bind(this)}
+            placeholder='Input country'
           />
           <button
             disabled={this.state.skips <= 0 ? true : undefined}
@@ -129,6 +134,7 @@ export default class FlagGuesser extends Component {
       return (
         <div className='flag-container'>
           <h1>{this.state.won ? "YOU WON!" : "YOU LOST!"}</h1>
+          <button onClick={this.playAgain.bind(this)}>Play again!</button>
         </div>
       );
     }
