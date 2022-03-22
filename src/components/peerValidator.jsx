@@ -1,6 +1,7 @@
 import React, { Component } from "react";
 import FlagGuesser from "./flagGuesser";
 import Peer from "peerjs";
+import Swal from "sweetalert2";
 
 const baseString = "e764INqYEz7mB6ern4YI";
 
@@ -12,7 +13,30 @@ export default class PeerValidator extends Component {
 
   createPeer() {
     this.setState({ loading: true });
-    const peer = new Peer(`${baseString}-${this.state.ownName}`);
+    const peer = new Peer(`${baseString}-${this.state.ownName}`, {
+      config: {
+        iceServers: [
+          {
+            urls: "stun:openrelay.metered.ca:80",
+          },
+          {
+            urls: "turn:openrelay.metered.ca:80",
+            username: "openrelayproject",
+            credential: "openrelayproject",
+          },
+          {
+            urls: "turn:openrelay.metered.ca:443",
+            username: "openrelayproject",
+            credential: "openrelayproject",
+          },
+          {
+            urls: "turn:openrelay.metered.ca:443?transport=tcp",
+            username: "openrelayproject",
+            credential: "openrelayproject",
+          },
+        ],
+      },
+    });
     peer.on(
       "open",
       function () {
@@ -27,7 +51,25 @@ export default class PeerValidator extends Component {
         connection.on("data", function (data) {
           console.log("Received " + data);
         });
+
         this.setState({ connected: true, connection, targetName });
+      }.bind(this)
+    );
+
+    peer.on(
+      "error",
+      function (connection) {
+        Swal.fire({
+          icon: "error",
+          title: "Oops...",
+          text: "This name is already in use!",
+        });
+        this.setState({
+          loading: false,
+          connected: false,
+          ownName: undefined,
+          peer: undefined,
+        });
       }.bind(this)
     );
 
@@ -50,36 +92,45 @@ export default class PeerValidator extends Component {
   render() {
     if (!this.state.connected && !this.state.peer) {
       return (
-        <div className='login-container'>
+        <form className='login-container'>
           <h2>Input user name:</h2>
           <input
+            autoFocus
             type='text'
             key={1}
             className='login-input'
-            onChange={(e) => this.setState({ ownName: e.target.value.trim() })}
+            onChange={(e) => this.setState({ ownName: e.target.value })}
+            placeholder='Enter your name'
           />
-          <button onClick={this.createPeer.bind(this)}>Login!</button>
-        </div>
+          <input
+            value='Login'
+            type='submit'
+            onClick={this.createPeer.bind(this)}
+            disabled={!this.state.ownName ? true : undefined}
+          ></input>
+        </form>
       );
     } else if (!this.state.connected && this.state.peer) {
       return (
-        <div className='connection-container'>
+        <form className='connection-container'>
           <h2>{this.state.loading ? "LOADING..." : this.state.ownName}</h2>
           <input
+            autoFocus
             type='text'
             key={2}
             className='connection-input'
             onChange={(e) =>
               this.setState({ targetName: e.target.value.trim() })
             }
+            placeholder='Where do you want connect?'
           />
-          <button
+          <input
+            value='Connect'
+            type='submit'
             disabled={this.state.loading ? true : undefined}
             onClick={this.connect.bind(this)}
-          >
-            Connect!
-          </button>
-        </div>
+          ></input>
+        </form>
       );
     } else {
       return (
@@ -88,6 +139,7 @@ export default class PeerValidator extends Component {
           connection={this.state.connection}
           ownName={this.state.ownName}
           targetName={this.state.targetName}
+          connectionState={(e) => this.setState(e)}
         ></FlagGuesser>
       );
     }

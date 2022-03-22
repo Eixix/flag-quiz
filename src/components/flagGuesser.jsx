@@ -60,6 +60,7 @@ export default class FlagGuesser extends Component {
     const stateValue = this.state.countryNames.map(name => name.toLowerCase());
     this.setState({ inputValue });
 
+
     const mappedStateValues = stateValue.map(countryName => {
       return {
         distance: Levenshtein.get(inputValue.trim(), countryName.trim()),
@@ -96,6 +97,10 @@ export default class FlagGuesser extends Component {
     }
   }
 
+  playAgain() {
+    this.props.connectionState({ connected: false });
+  }
+
   render() {
     if (this.state.won === undefined) {
       return (
@@ -116,6 +121,7 @@ export default class FlagGuesser extends Component {
             value={this.state.inputValue}
             type='text'
             onChange={this.validateInput.bind(this)}
+            placeholder='Input country'
           />
           <button
             disabled={this.state.skips <= 0 ? true : undefined}
@@ -129,6 +135,7 @@ export default class FlagGuesser extends Component {
       return (
         <div className='flag-container'>
           <h1>{this.state.won ? "YOU WON!" : "YOU LOST!"}</h1>
+          <button onClick={this.playAgain.bind(this)}>Play again!</button>
         </div>
       );
     }
