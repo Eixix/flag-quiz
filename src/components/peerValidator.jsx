@@ -1,7 +1,9 @@
 import React, { Component } from "react";
-import FlagGuesser from "./flagGuesser";
 import Peer from "peerjs";
 import Swal from "sweetalert2";
+import FirstToXPoints from "./quizComponents/firstToXPoints";
+
+import Flags from "../res/countryFlags.json";
 
 const baseString = "e764INqYEz7mB6ern4YI";
 
@@ -134,13 +136,18 @@ export default class PeerValidator extends Component {
       );
     } else {
       return (
-        <FlagGuesser
-          peer={this.state.peer}
-          connection={this.state.connection}
-          ownName={this.state.ownName}
-          targetName={this.state.targetName}
-          connectionState={(e) => this.setState(e)}
-        ></FlagGuesser>
+				// Game choosing components
+				<FirstToXPoints 
+				connectionSettings={{
+					peer: this.state.peer, 
+					connection: this.state.connection, 
+					ownName: this.state.ownName, 
+					targetName: this.state.targetName, 
+					setConnectionState: (e) => this.setState(e)}}
+				gameSettings={{
+					questions: Flags
+				}}>
+				</FirstToXPoints>
       );
     }
   }

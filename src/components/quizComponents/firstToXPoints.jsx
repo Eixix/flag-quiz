@@ -1,21 +1,20 @@
 import React, { Component } from "react";
-import Countries from "../res/countryFlags.json";
 import Levenshtein from "fast-levenshtein";
 import party from "party-js";
 
-export default class FlagGuesser extends Component {
+export default class FirstToXPoints extends Component {
   constructor(props) {
     super(props);
 
-    const [countryCode, countryNames] = this.randomCountry();
+    const [image, solutions] = this.randomQuestion();
     this.state = {
-      countryCode,
-      countryNames,
+      image,
+      solutions,
       score: 0,
       enemyScore: 0,
-      inputValue: "",
-      peer: this.props.peer,
-      connection: this.props.connection,
+      inputValue: undefined,
+      peer: this.props.connectionSettings.peer,
+      connection: this.props.connectionSettings.connection,
       skips: 3,
       goalScore: 10,
       won: undefined,
@@ -35,39 +34,39 @@ export default class FlagGuesser extends Component {
     );
   }
 
-  randomCountry() {
-    const keys = Object.keys(Countries);
+  randomQuestion() {
+    const keys = Object.keys(this.props.gameSettings.questions);
     const random = (keys.length * Math.random()) << 0;
-    const countryCode = keys[random];
-    const countryNames = Countries[countryCode];
-    return [countryCode.toLowerCase(), countryNames];
+    const image = keys[random];
+    const solutions = this.props.gameSettings.questions[image];
+    return [image.toLowerCase(), solutions];
   }
 
-  skipCountry() {
+  skipQuestion() {
     if (this.state.skips > 0) {
       this.setState((prevState) => ({
         skips: prevState.skips - 1,
       }));
 
       this.setState({ inputValue: "" });
-      const [countryCode, countryNames] = this.randomCountry();
-      this.setState({ countryCode, countryNames });
+      const [image, solutions] = this.randomQuestion();
+      this.setState({ image, solutions });
     }
   }
 
   validateInput(event) {
     const inputValue = event.target.value.toLowerCase();
-    const stateValue = this.state.countryNames.map(name => name.toLowerCase());
+    const stateValue = this.state.solutions.map(name => name.toLowerCase());
     this.setState({ inputValue });
 
 
-    const mappedStateValues = stateValue.map(countryName => {
+    const mappedStateValues = stateValue.map(solution => {
       return {
-        distance: Levenshtein.get(inputValue.trim(), countryName.trim()),
-        countryName: countryName.trim()
+        distance: Levenshtein.get(inputValue.trim(), solution.trim()),
+        solution: solution.trim()
       };
     });
-    if (mappedStateValues.reduce((prev, curr) => prev || (curr.distance < 2 && curr.countryName.length == inputValue.trim().length), false)) {
+    if (mappedStateValues.reduce((prev, curr) => prev || (curr.distance < 2 && curr.solution.length == inputValue.trim().length), false)) {
       this.setState({ error: false });
       this.setState({ success: true });
       this.setState((prevState) => ({
@@ -75,8 +74,8 @@ export default class FlagGuesser extends Component {
       }));
 
       this.setState({ inputValue: "" });
-      const [countryCode, countryNames] = this.randomCountry();
-      this.setState({ countryCode, countryNames });
+      const [image, solutions] = this.randomCountry();
+      this.setState({ image, solutions });
 
       if (this.state.score >= this.state.goalScore - 1) {
         this.state.connection.send("won");
@@ -88,7 +87,7 @@ export default class FlagGuesser extends Component {
         this.state.connection.send("+1");
         setTimeout(() => this.setState({ success: false }), 2000);
       }
-    } else if (mappedStateValues.reduce((prev, curr) => prev || (curr.distance > 6 && !curr.countryName.includes(inputValue.trim())), false)) {
+    } else if (mappedStateValues.reduce((prev, curr) => prev || (curr.distance > 6 && !curr.solution.includes(inputValue.trim())), false)) {
       this.setState({ success: false });
       this.setState({ error: true });
     } else {
@@ -112,7 +111,7 @@ export default class FlagGuesser extends Component {
             {this.props.targetName}: {this.state.enemyScore}
           </h2>
           <h2>Which country is this?</h2>
-          <span className={"big-flag fi fi-" + this.state.countryCode}></span>
+          <span className={"big-flag fi fi-" + this.state.image}></span>
           <input
             className={
               this.state.error ? "error" : this.state.success ? "success" : ""
@@ -125,7 +124,7 @@ export default class FlagGuesser extends Component {
           />
           <button
             disabled={this.state.skips <= 0 ? true : undefined}
-            onClick={this.skipCountry.bind(this)}
+            onClick={this.skipQuestion.bind(this)}
           >
             Skip ({this.state.skips} left)
           </button>
