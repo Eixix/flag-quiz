@@ -16,6 +16,9 @@ export default class PeerValidator extends Component {
   createPeer() {
     this.setState({ loading: true });
     const peer = new Peer(`${baseString}-${this.state.ownName}`, {
+      host: "3f7e15ba-9164-450a-a050-3515dbe9f5ea.ul.bw-cloud-instance.org",
+      port: 9000,
+      path: "/myapp",
       config: {
         iceServers: [
           {
@@ -60,11 +63,12 @@ export default class PeerValidator extends Component {
 
     peer.on(
       "error",
+      // TODO: Split into different errors
       function (connection) {
         Swal.fire({
           icon: "error",
           title: "Oops...",
-          text: "This name is already in use!",
+          text: "There is an error with your connection!",
         });
         this.setState({
           loading: false,
@@ -136,18 +140,23 @@ export default class PeerValidator extends Component {
       );
     } else {
       return (
-				// Game choosing components
-				<FirstToXPoints 
-				connectionSettings={{
-					peer: this.state.peer, 
-					connection: this.state.connection, 
-					ownName: this.state.ownName, 
-					targetName: this.state.targetName, 
-					setConnectionState: (e) => this.setState(e)}}
-				gameSettings={{
-					questions: Flags
-				}}>
-				</FirstToXPoints>
+        // TODO: Game choosing components
+        <FirstToXPoints
+          connectionSettings={{
+            peer: this.state.peer,
+            connection: this.state.connection,
+            ownName: this.state.ownName,
+            targetName: this.state.targetName,
+            setConnectionState: (e) => this.setState(e),
+          }}
+          gameSettings={{
+            questions: Flags,
+            questionRenderer: (e) => (
+              <span className={"big-flag fi fi-" + e}></span>
+            ),
+            heading: "Which country is this?",
+          }}
+        ></FirstToXPoints>
       );
     }
   }

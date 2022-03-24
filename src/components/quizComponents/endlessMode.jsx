@@ -1,17 +1,15 @@
 import React, { Component } from "react";
 import Levenshtein from "fast-levenshtein";
 import party from "party-js";
-import { shuffleArray } from "../../services/helpers";
 
 export default class FirstToXPoints extends Component {
   constructor(props) {
     super(props);
 
+    const [question, solutions] = this.randomQuestion();
     this.state = {
-      allQuestions: shuffleArray(this.props.gameSettings.questions),
-      skippedQuestions: {},
-      question: "",
-      solutions: "",
+      question,
+      solutions,
       score: 0,
       enemyScore: 0,
       inputValue: undefined,
@@ -36,21 +34,12 @@ export default class FirstToXPoints extends Component {
     );
   }
 
-  componentDidMount() {
-    this.getNextQuestion();
-  }
-
-  getNextQuestion() {
-    const question = Object.keys(this.state.allQuestions)[
-      this.state.allQuestions.length - 1
-    ];
-    const solutions = this.state.allQuestions[question];
-    console.log(question, solutions);
-    this.setState((prevState) => ({
-      allQuestions: prevState.allQuestions.slice(0, -1),
-      question,
-      solutions,
-    }));
+  randomQuestion() {
+    const keys = Object.keys(this.props.gameSettings.questions);
+    const random = (keys.length * Math.random()) << 0;
+    const question = keys[random];
+    const solutions = this.props.gameSettings.questions[question];
+    return [question.toLowerCase(), solutions];
   }
 
   skipQuestion() {
@@ -60,7 +49,7 @@ export default class FirstToXPoints extends Component {
       }));
 
       this.setState({ inputValue: "" });
-      const [question, solutions] = this.getNextQuestion();
+      const [question, solutions] = this.randomQuestion();
       this.setState({ question, solutions });
     }
   }
@@ -92,7 +81,8 @@ export default class FirstToXPoints extends Component {
       }));
 
       this.setState({ inputValue: "" });
-      this.getNextQuestion();
+      const [question, solutions] = this.randomQuestion();
+      this.setState({ question, solutions });
 
       if (this.state.score >= this.state.goalScore - 1) {
         this.state.connection.send("won");
