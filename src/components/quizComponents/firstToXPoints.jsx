@@ -8,7 +8,7 @@ export default class FirstToXPoints extends Component {
     super(props);
 
     this.state = {
-      allQuestions: shuffleArray(this.props.gameSettings.questions),
+      allQuestions: this.props.gameSettings.questions,
       skippedQuestions: {},
       question: "",
       solutions: "",
@@ -17,8 +17,8 @@ export default class FirstToXPoints extends Component {
       inputValue: undefined,
       peer: this.props.connectionSettings.peer,
       connection: this.props.connectionSettings.connection,
-      skips: 3,
-      goalScore: 10,
+      skips: this.props.gameSettings.skips,
+      goalScore: this.props.gameSettings.goalScore,
       won: undefined,
     };
 
@@ -41,16 +41,19 @@ export default class FirstToXPoints extends Component {
   }
 
   getNextQuestion() {
-    const question = Object.keys(this.state.allQuestions)[
-      this.state.allQuestions.length - 1
-    ];
-    const solutions = this.state.allQuestions[question];
-    console.log(question, solutions);
-    this.setState((prevState) => ({
-      allQuestions: prevState.allQuestions.slice(0, -1),
-      question,
+    const allQuestions = this.state.allQuestions;
+    const keys = Object.keys(allQuestions);
+    const random = (keys.length * Math.random()) << 0;
+    const question = keys[random];
+    const solutions = allQuestions[question];
+
+    delete allQuestions[question];
+
+    this.setState({
+      allQuestions,
+      question: question.toLowerCase(),
       solutions,
-    }));
+    });
   }
 
   skipQuestion() {
@@ -81,7 +84,7 @@ export default class FirstToXPoints extends Component {
         (prev, curr) =>
           prev ||
           (curr.distance < 2 &&
-            curr.solution.length == inputValue.trim().length),
+            curr.solution.length === inputValue.trim().length),
         false
       )
     ) {
@@ -129,10 +132,10 @@ export default class FirstToXPoints extends Component {
       return (
         <div className='quiz-container'>
           <h2 className={"quiz-score " + (this.state.success ? "success" : "")}>
-            {this.props.ownName}: {this.state.score}{" "}
+            {this.props.connectionSettings.ownName}: {this.state.score}{" "}
           </h2>
           <h2>
-            {this.props.targetName}: {this.state.enemyScore}
+            {this.props.connectionSettings.targetName}: {this.state.enemyScore}
           </h2>
           <h2>{this.props.gameSettings.heading}</h2>
           {this.props.gameSettings.questionRenderer(this.state.question)}

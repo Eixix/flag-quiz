@@ -1,22 +1,24 @@
 import React, { Component } from "react";
 import Levenshtein from "fast-levenshtein";
 import party from "party-js";
+import { shuffleArray } from "../../services/helpers";
 
 export default class FirstToXPoints extends Component {
   constructor(props) {
     super(props);
 
-    const [question, solutions] = this.randomQuestion();
     this.state = {
-      question,
-      solutions,
+      allQuestions: this.props.gameSettings.questions,
+      skippedQuestions: {},
+      question: "",
+      solutions: "",
       score: 0,
       enemyScore: 0,
       inputValue: undefined,
       peer: this.props.connectionSettings.peer,
       connection: this.props.connectionSettings.connection,
-      skips: 3,
-      goalScore: 10,
+      skips: this.props.gameSettings.skips,
+      time: this.props.gameSettings.time,
       won: undefined,
     };
 
@@ -34,12 +36,24 @@ export default class FirstToXPoints extends Component {
     );
   }
 
-  randomQuestion() {
-    const keys = Object.keys(this.props.gameSettings.questions);
+  componentDidMount() {
+    this.getNextQuestion();
+  }
+
+  getNextQuestion() {
+    const allQuestions = this.state.allQuestions;
+    const keys = Object.keys(allQuestions);
     const random = (keys.length * Math.random()) << 0;
     const question = keys[random];
-    const solutions = this.props.gameSettings.questions[question];
-    return [question.toLowerCase(), solutions];
+    const solutions = allQuestions[question];
+
+    delete allQuestions[question];
+
+    this.setState({
+      allQuestions,
+      question: question.toLowerCase(),
+      solutions,
+    });
   }
 
   skipQuestion() {
@@ -49,7 +63,7 @@ export default class FirstToXPoints extends Component {
       }));
 
       this.setState({ inputValue: "" });
-      const [question, solutions] = this.randomQuestion();
+      const [question, solutions] = this.getNextQuestion();
       this.setState({ question, solutions });
     }
   }
@@ -70,7 +84,7 @@ export default class FirstToXPoints extends Component {
         (prev, curr) =>
           prev ||
           (curr.distance < 2 &&
-            curr.solution.length == inputValue.trim().length),
+            curr.solution.length === inputValue.trim().length),
         false
       )
     ) {
@@ -81,8 +95,7 @@ export default class FirstToXPoints extends Component {
       }));
 
       this.setState({ inputValue: "" });
-      const [question, solutions] = this.randomQuestion();
-      this.setState({ question, solutions });
+      this.getNextQuestion();
 
       if (this.state.score >= this.state.goalScore - 1) {
         this.state.connection.send("won");
@@ -119,10 +132,10 @@ export default class FirstToXPoints extends Component {
       return (
         <div className='quiz-container'>
           <h2 className={"quiz-score " + (this.state.success ? "success" : "")}>
-            {this.props.ownName}: {this.state.score}{" "}
+            {this.props.connectionSettings.ownName}: {this.state.score}{" "}
           </h2>
           <h2>
-            {this.props.targetName}: {this.state.enemyScore}
+            {this.props.connectionSettings.targetName}: {this.state.enemyScore}
           </h2>
           <h2>{this.props.gameSettings.heading}</h2>
           {this.props.gameSettings.questionRenderer(this.state.question)}

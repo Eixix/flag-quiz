@@ -17,7 +17,7 @@ export default class PeerValidator extends Component {
     this.setState({ loading: true });
     const peer = new Peer(`${baseString}-${this.state.ownName}`, {
       host: "3f7e15ba-9164-450a-a050-3515dbe9f5ea.ul.bw-cloud-instance.org",
-      port: 9000,
+      port: 9001,
       path: "/myapp",
       config: {
         iceServers: [
@@ -141,7 +141,7 @@ export default class PeerValidator extends Component {
     } else {
       return (
         // TODO: Game choosing components
-        <FirstToXPoints
+        <timerMode
           connectionSettings={{
             peer: this.state.peer,
             connection: this.state.connection,
@@ -154,9 +154,11 @@ export default class PeerValidator extends Component {
             questionRenderer: (e) => (
               <span className={"big-flag fi fi-" + e}></span>
             ),
+            skips: 3,
+            goalScore: 10,
             heading: "Which country is this?",
           }}
-        ></FirstToXPoints>
+        ></timerMode>
       );
     }
   }
