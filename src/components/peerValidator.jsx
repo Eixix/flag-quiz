@@ -1,7 +1,8 @@
 import React, { Component } from "react";
 import Peer from "peerjs";
 import Swal from "sweetalert2";
-import FirstToXPoints from "./quizComponents/firstToXPoints";
+import FirstToXPoints from "./quizComponents/FirstToXPoints";
+import TimerMode from "./quizComponents/TimerMode";
 
 import Flags from "../res/countryFlags.json";
 
@@ -61,23 +62,23 @@ export default class PeerValidator extends Component {
       }.bind(this)
     );
 
-    peer.on(
-      "error",
-      // TODO: Split into different errors
-      function (connection) {
-        Swal.fire({
-          icon: "error",
-          title: "Oops...",
-          text: "There is an error with your connection!",
-        });
-        this.setState({
-          loading: false,
-          connected: false,
-          ownName: undefined,
-          peer: undefined,
-        });
-      }.bind(this)
-    );
+    //peer.on(
+    //  "error",
+    //  // TODO: Split into different errors
+    //  function (connection) {
+    //    Swal.fire({
+    //      icon: "error",
+    //      title: "Oops...",
+    //      text: "There is an error with your connection!",
+    //    });
+    //    this.setState({
+    //      loading: false,
+    //      connected: false,
+    //      ownName: undefined,
+    //      peer: undefined,
+    //    });
+    //  }.bind(this)
+    //);
 
     this.setState({ peer });
   }
@@ -141,7 +142,26 @@ export default class PeerValidator extends Component {
     } else {
       return (
         // TODO: Game choosing components
-        <timerMode
+        //<FirstToXPoints
+        //  connectionSettings={{
+        //    peer: this.state.peer,
+        //    connection: this.state.connection,
+        //    ownName: this.state.ownName,
+        //    targetName: this.state.targetName,
+        //    setConnectionState: (e) => this.setState(e),
+        //  }}
+        //  gameSettings={{
+        //    questions: Flags,
+        //    questionRenderer: (e) => (
+        //      <span className={"big-flag fi fi-" + e}></span>
+        //    ),
+        //    skips: 3,
+        //    goalScore: 10,
+        //    heading: "Which country is this?",
+        //  }}
+        //></FirstToXPoints>
+
+        <TimerMode
           connectionSettings={{
             peer: this.state.peer,
             connection: this.state.connection,
@@ -155,10 +175,10 @@ export default class PeerValidator extends Component {
               <span className={"big-flag fi fi-" + e}></span>
             ),
             skips: 3,
-            goalScore: 10,
+            time: 30,
             heading: "Which country is this?",
           }}
-        ></timerMode>
+        ></TimerMode>
       );
     }
   }

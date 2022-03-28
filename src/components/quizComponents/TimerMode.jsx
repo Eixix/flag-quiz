@@ -1,9 +1,9 @@
 import React, { Component } from "react";
 import Levenshtein from "fast-levenshtein";
 import party from "party-js";
-import { shuffleArray } from "../../services/helpers";
+import secondsToTime from "../../services/secondsToTime";
 
-export default class FirstToXPoints extends Component {
+export default class TimerMode extends Component {
   constructor(props) {
     super(props);
 
@@ -18,9 +18,11 @@ export default class FirstToXPoints extends Component {
       peer: this.props.connectionSettings.peer,
       connection: this.props.connectionSettings.connection,
       skips: this.props.gameSettings.skips,
-      goalScore: this.props.gameSettings.goalScore,
+      time: undefined,
+      seconds: this.props.gameSettings.time,
       won: undefined,
     };
+    this.timer = 0;
 
     this.state.connection.on(
       "data",
@@ -37,7 +39,37 @@ export default class FirstToXPoints extends Component {
   }
 
   componentDidMount() {
+    const timeLeft = secondsToTime(this.state.seconds);
+    this.setState({ time: timeLeft });
     this.getNextQuestion();
+    this.timer = setInterval(this.countDown.bind(this), 1000);
+  }
+
+  countDown() {
+    // Remove one second, set state so a re-render happens.
+    const seconds = this.state.seconds - 1;
+    this.setState({
+      time: secondsToTime(seconds),
+      seconds: seconds,
+    });
+
+    // Check if we're at zero for winning player.
+    if (seconds == 0) {
+      if (this.state.enemyScore > this.state.score) {
+        clearInterval(this.timer);
+        this.setState({ won: false });
+      } else if (this.state.enemyScore < this.state.score) {
+        clearInterval(this.timer);
+        this.state.connection.send("won");
+        this.setState({ won: true });
+        party.confetti(document.body, {
+          count: party.variation.range(100, 250),
+        });
+      } else {
+        // Extend time to play by 10 seconds because there is no winner
+        this.setState({ seconds: 10 });
+      }
+    }
   }
 
   getNextQuestion() {
@@ -97,16 +129,8 @@ export default class FirstToXPoints extends Component {
       this.setState({ inputValue: "" });
       this.getNextQuestion();
 
-      if (this.state.score >= this.state.goalScore - 1) {
-        this.state.connection.send("won");
-        this.setState({ won: true });
-        party.confetti(document.body, {
-          count: party.variation.range(100, 250),
-        });
-      } else {
-        this.state.connection.send("+1");
-        setTimeout(() => this.setState({ success: false }), 2000);
-      }
+      this.state.connection.send("+1");
+      setTimeout(() => this.setState({ success: false }), 2000);
     } else if (
       mappedStateValues.reduce(
         (prev, curr) =>
@@ -131,6 +155,7 @@ export default class FirstToXPoints extends Component {
     if (this.state.won === undefined) {
       return (
         <div className='quiz-container'>
+          <h2>Time: {this.state.time ?? "00:00"}</h2>
           <h2 className={"quiz-score " + (this.state.success ? "success" : "")}>
             {this.props.connectionSettings.ownName}: {this.state.score}{" "}
           </h2>

@@ -1,7 +1,6 @@
 import React, { Component } from "react";
 import Levenshtein from "fast-levenshtein";
 import party from "party-js";
-import { shuffleArray } from "../../services/helpers";
 
 export default class FirstToXPoints extends Component {
   constructor(props) {
@@ -18,7 +17,7 @@ export default class FirstToXPoints extends Component {
       peer: this.props.connectionSettings.peer,
       connection: this.props.connectionSettings.connection,
       skips: this.props.gameSettings.skips,
-      time: this.props.gameSettings.time,
+      goalScore: this.props.gameSettings.goalScore,
       won: undefined,
     };
 
