@@ -155,7 +155,9 @@ export default class TimerMode extends Component {
     if (this.state.won === undefined) {
       return (
         <div className='quiz-container'>
-          <h2>Time: {this.state.time ?? "00:00"}</h2>
+          <h2 style={{ color: this.state.seconds <= 3 ? "red" : "inherit" }}>
+            Time: {this.state.time ?? "00:00"}
+          </h2>
           <h2 className={"quiz-score " + (this.state.success ? "success" : "")}>
             {this.props.connectionSettings.ownName}: {this.state.score}{" "}
           </h2>

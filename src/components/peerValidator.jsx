@@ -62,23 +62,23 @@ export default class PeerValidator extends Component {
       }.bind(this)
     );
 
-    //peer.on(
-    //  "error",
-    //  // TODO: Split into different errors
-    //  function (connection) {
-    //    Swal.fire({
-    //      icon: "error",
-    //      title: "Oops...",
-    //      text: "There is an error with your connection!",
-    //    });
-    //    this.setState({
-    //      loading: false,
-    //      connected: false,
-    //      ownName: undefined,
-    //      peer: undefined,
-    //    });
-    //  }.bind(this)
-    //);
+    peer.on(
+      "error",
+      // TODO: Split into different errors
+      function (connection) {
+        Swal.fire({
+          icon: "error",
+          title: "Oops...",
+          text: "There is an error with your connection!",
+        });
+        this.setState({
+          loading: false,
+          connected: false,
+          ownName: undefined,
+          peer: undefined,
+        });
+      }.bind(this)
+    );
 
     this.setState({ peer });
   }
