@@ -142,6 +142,7 @@ export default class PeerValidator extends Component {
     } else {
       return (
         // TODO: Game choosing components
+        // with rooms
         //<FirstToXPoints
         //  connectionSettings={{
         //    peer: this.state.peer,
