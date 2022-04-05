@@ -1,9 +1,9 @@
 import './scss/App.scss';
-import PeerValidator from './components/peerValidator';
+import Menu from './components/menu';
 
 function App() {
     return (
-        <main><PeerValidator /></main>
+        <main><Menu /></main>
     );
 }
 
