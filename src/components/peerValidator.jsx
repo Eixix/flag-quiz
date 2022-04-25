@@ -14,8 +14,8 @@ export default class PeerValidator extends Component {
   createPeer() {
     this.setState({ loading: true });
     const peer = new Peer(`${baseString}-${this.state.ownName}`, {
-      host: "3f7e15ba-9164-450a-a050-3515dbe9f5ea.ul.bw-cloud-instance.org",
-      port: 9000,
+      host: "peer.tobiasbetz.de",
+      port: 443,
       path: "/myapp",
       config: {
         iceServers: [
