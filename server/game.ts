@@ -21,7 +21,7 @@ export class GameServer {
     const room = this.roomFor(playerId);
     if (!room) return this.error(socket, "Create or join a room first.");
     if (message.type === "start_game") return this.start(room, playerId);
-    if (message.type === "answer") return this.answer(room, playerId, message.answer);
+    if (message.type === "answer") return this.answer(room, playerId, message.answer, message.question, message.final ?? false);
     if (message.type === "skip") return this.skip(room, playerId);
     if (message.type === "play_again") return this.reset(room, playerId);
   }
@@ -98,11 +98,11 @@ export class GameServer {
     this.broadcast(room);
   }
 
-  private answer(room: Room, playerId: string, rawAnswer: string) {
+  private answer(room: Room, playerId: string, rawAnswer: string, question: string, final: boolean) {
     const player = room.players.get(playerId)!;
-    if (room.phase !== "playing" || !room.question) return;
-    const accepted = flags[room.question as keyof typeof flags].some((solution) => isAnswerCorrect(rawAnswer, solution));
-    player.socket.send(JSON.stringify({ type: "answer", correct: accepted }));
+    if (room.phase !== "playing" || !room.question || question !== room.question) return;
+    const accepted = isAcceptedAnswer(rawAnswer, room.question);
+    if (accepted || final) player.socket.send(JSON.stringify({ type: "answer", correct: accepted }));
     if (accepted) {
       player.score += 1;
       this.nextQuestion(room);
@@ -180,4 +180,25 @@ export function isAnswerCorrect(answer: string, solution: string) {
   let differences = 0;
   for (let index = 0; index < left.length; index += 1) if (left[index] !== right[index] && ++differences > 1) return false;
   return true;
+}
+
+export function isAcceptedAnswer(answer: string, countryCode: string) {
+  const normalized = normalizeAnswer(answer);
+  if (!normalized || !(countryCode in flags)) return false;
+
+  const matchingCountries = (matcher: (alias: string) => boolean) => new Set(
+    Object.entries(flags)
+      .filter(([, aliases]) => aliases.some((alias) => matcher(normalizeAnswer(alias))))
+      .map(([code]) => code),
+  );
+  const uniquelyMatchesCountry = (countries: Set<string>) => countries.size === 1 && countries.has(countryCode);
+
+  const exactMatches = matchingCountries((alias) => alias === normalized);
+  if (exactMatches.size > 0) return uniquelyMatchesCountry(exactMatches);
+
+  const fuzzyMatches = matchingCountries((alias) => isAnswerCorrect(normalized, alias));
+  if (fuzzyMatches.size > 0) return uniquelyMatchesCountry(fuzzyMatches);
+
+  if (normalized.length < 3) return false;
+  return uniquelyMatchesCountry(matchingCountries((alias) => alias.startsWith(normalized)));
 }

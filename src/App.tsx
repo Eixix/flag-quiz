@@ -82,7 +82,7 @@ export default function App() {
     <header className="game-header"><div><span className="eyebrow">Room {room.roomCode}</span><strong>{me?.score ?? 0} points</strong></div><div className={seconds <= 5 ? "timer urgent" : "timer"}>{seconds}s</div></header>
     <Scoreboard room={room} playerId={playerId} />
     <div className="flag-card"><img src={flagUrl(room.question)} alt="Flag to identify" /></div>
-    <AnswerForm result={answerResult} onAnswer={(answer) => send({ type: "answer", answer })} />
+    <AnswerForm question={room.question ?? ""} result={answerResult} onAnswer={(answer, final) => send({ type: "answer", answer, question: room.question ?? "", final })} />
     <button className="secondary" disabled={room.hasVotedToSkip} onClick={() => send({ type: "skip" })}>
       {room.hasVotedToSkip ? "Waiting for everyone" : "Vote to skip"} · {room.skipVotes ?? 0}/{room.skipVotesRequired ?? room.players.length}
     </button>
@@ -103,9 +103,10 @@ function Home({ connection, error, send }: { connection: string; error: string; 
   </section></Shell>;
 }
 
-function AnswerForm({ result, onAnswer }: { result: boolean | null; onAnswer: (answer: string) => void }) {
+function AnswerForm({ question, result, onAnswer }: { question: string; result: boolean | null; onAnswer: (answer: string, final: boolean) => void }) {
   const [answer, setAnswer] = useState("");
-  return <form className={`answer ${result === true ? "correct" : result === false ? "wrong" : ""}`} onSubmit={(event) => { event.preventDefault(); if (answer.trim()) { onAnswer(answer); setAnswer(""); } }}><input autoFocus value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder="Type the country…" autoComplete="off" /><button className="primary">Submit</button></form>;
+  useEffect(() => setAnswer(""), [question]);
+  return <form className={`answer ${result === true ? "correct" : result === false ? "wrong" : ""}`} onSubmit={(event) => { event.preventDefault(); if (answer.trim()) onAnswer(answer, true); }}><input autoFocus value={answer} onChange={(e) => { const value = e.target.value; setAnswer(value); if (value.trim()) onAnswer(value, false); }} placeholder="Type the country…" autoComplete="off" /><button className="primary">Submit</button></form>;
 }
 
 function Scoreboard({ room, playerId }: { room: RoomState; playerId: string }) {

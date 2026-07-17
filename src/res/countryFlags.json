@@ -101,7 +101,8 @@
     ],
     "CF": [
         "Central African Republic",
-        "Central Africa"
+        "Central Africa",
+        "CAR"
     ],
     "TD": [
         "Chad"
@@ -119,11 +120,16 @@
         "Comoros"
     ],
     "CG": [
-        "Congo"
+        "Congo",
+        "Republic of the Congo",
+        "Congo Brazzaville"
     ],
     "CD": [
         "Congo, Democratic Republic",
-        "Dem Rep Congo"
+        "Dem Rep Congo",
+        "Democratic Republic of the Congo",
+        "DR Congo",
+        "DRC"
     ],
     "CR": [
         "Costa Rica"
@@ -274,7 +280,12 @@
         "Kiribati"
     ],
     "KP": [
-        "North Korea"
+        "North Korea",
+        "DPRK"
+    ],
+    "KR": [
+        "South Korea",
+        "Republic of Korea"
     ],
     "KW": [
         "Kuwait"

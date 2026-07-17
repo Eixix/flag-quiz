@@ -24,6 +24,6 @@ export type ClientMessage =
   | { type: "create_room"; name: string }
   | { type: "join_room"; name: string; roomCode: string }
   | { type: "start_game" }
-  | { type: "answer"; answer: string }
+  | { type: "answer"; answer: string; question: string; final?: boolean }
   | { type: "skip" }
   | { type: "play_again" };

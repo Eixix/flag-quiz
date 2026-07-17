@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { GameServer, isAnswerCorrect, normalizeAnswer } from "./game";
+import { GameServer, isAcceptedAnswer, isAnswerCorrect, normalizeAnswer } from "./game";
 
 const socket = () => ({ messages: [] as any[], send(data: string) { this.messages.push(JSON.parse(data)); } });
 
@@ -9,6 +9,16 @@ describe("answer matching", () => {
     expect(isAnswerCorrect("germamy", "Germany")).toBeTrue();
     expect(isAnswerCorrect("German", "Germany")).toBeFalse();
     expect(isAnswerCorrect("", "Chad")).toBeFalse();
+  });
+
+  test("accepts aliases and unambiguous country prefixes", () => {
+    expect(isAcceptedAnswer("DRC", "CD")).toBeTrue();
+    expect(isAcceptedAnswer("germ", "DE")).toBeTrue();
+    expect(isAcceptedAnswer("south", "KR")).toBeFalse();
+    expect(isAcceptedAnswer("congo", "CG")).toBeTrue();
+    expect(isAcceptedAnswer("con", "CG")).toBeFalse();
+    expect(isAcceptedAnswer("Iran", "IQ")).toBeFalse();
+    expect(isAcceptedAnswer("Iraq", "IQ")).toBeTrue();
   });
 });
 
@@ -26,10 +36,13 @@ describe("rooms", () => {
     expect(guest.messages.at(-1).question).toBe(third.messages.at(-1).question);
     expect(host.messages.at(-1).players).toHaveLength(3);
 
-    game.handle("host", host, { type: "answer", answer: "Afghanistan" });
+    game.handle("host", host, { type: "answer", answer: "Afghanistan", question: "AF" });
     expect(host.messages.at(-1).question).toBe("AL");
     expect(guest.messages.at(-1).question).toBe("AL");
     expect(host.messages.at(-1).players.find((player: any) => player.id === "host").score).toBe(1);
+
+    game.handle("guest", guest, { type: "answer", answer: "Alb", question: "AF" });
+    expect(guest.messages.at(-1).question).toBe("AL");
   });
 
   test("only skips after every connected player agrees", () => {
