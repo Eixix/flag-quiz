@@ -1,0 +1,37 @@
+name: flag-quiz
+
+services:
+  flag-quiz:
+    container_name: flag-quiz
+    build:
+      context: .
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+    networks:
+      - external_network
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: [CMD, bun, -e, "fetch('http://127.0.0.1:3000/healthz').then(r => { if (!r.ok) process.exit(1) }).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.flag-quiz.rule=Host(`${FLAG_DOMAIN:?Set FLAG_DOMAIN}`)
+      - traefik.http.routers.flag-quiz.entrypoints=websecure
+      - traefik.http.routers.flag-quiz.priority=100
+      - traefik.http.routers.flag-quiz.tls=true
+      - traefik.http.routers.flag-quiz.tls.certresolver=externalresolver
+      - traefik.http.routers.flag-quiz.middlewares=security-headers@file
+      - traefik.http.services.flag-quiz.loadbalancer.server.port=3000
+      - traefik.docker.network=external_network
+
+networks:
+  external_network:
+    external: true
+    name: external_network

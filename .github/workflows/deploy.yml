@@ -21,7 +21,6 @@ jobs:
       DEPLOY_HOST: ${{ secrets.SSH_HOST }}
       DEPLOY_USER: github
       APP_PATH: /home/github/flag-quiz
-      HOMELAB_PATH: /home/github/homelab
       FLAG_DOMAIN: ${{ secrets.FLAG_DOMAIN }}
     steps:
       - name: Connect WireGuard
@@ -61,7 +60,7 @@ jobs:
             --exclude='/.git/' --exclude='/.env' --exclude='/node_modules/' --exclude='/dist/' \
             ./ "$DEPLOY_USER@$DEPLOY_HOST:$APP_PATH/"
 
-      - name: Rebuild through homelab Compose
+      - name: Build and start application
         run: |
           set -euo pipefail
           if [[ ! "$FLAG_DOMAIN" =~ ^[a-zA-Z0-9.-]+$ ]]; then
@@ -69,21 +68,14 @@ jobs:
             exit 1
           fi
           FLAG_DOMAIN_B64="$(printf '%s' "$FLAG_DOMAIN" | base64 -w 0)"
-          ssh "$DEPLOY_USER@$DEPLOY_HOST" "FLAG_DOMAIN_B64='$FLAG_DOMAIN_B64' HOMELAB_PATH='$HOMELAB_PATH' bash -s" <<'REMOTE'
+          ssh "$DEPLOY_USER@$DEPLOY_HOST" "FLAG_DOMAIN_B64='$FLAG_DOMAIN_B64' APP_PATH='$APP_PATH' bash -s" <<'REMOTE'
             set -euo pipefail
-            cd "$HOMELAB_PATH"
+            cd "$APP_PATH"
             flag_domain="$(printf '%s' "$FLAG_DOMAIN_B64" | base64 --decode)"
-            awk -v value="$flag_domain" '
-              BEGIN { found = 0 }
-              /^FLAG_QUIZ_HOST=/ { print "FLAG_QUIZ_HOST=" value; found = 1; next }
-              { print }
-              END { if (!found) print "FLAG_QUIZ_HOST=" value }
-            ' .env > .env.tmp
-            chmod --reference=.env .env.tmp
-            mv .env.tmp .env
-            docker compose --env-file .env --profile external config --quiet
-            docker compose --env-file .env --profile external build --pull flag-quiz
-            docker compose --env-file .env --profile external up -d flag-quiz
+            export FLAG_DOMAIN="$flag_domain"
+            docker compose config --quiet
+            docker compose build --pull flag-quiz
+            docker compose up -d flag-quiz
           REMOTE
 
       - name: Verify public application

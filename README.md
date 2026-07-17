@@ -25,7 +25,7 @@ docker build -t flag-quiz .
 
 ## Deployment
 
-Pushes to `main` run CI. After CI succeeds, the deploy workflow synchronizes this repository to `/home/github/flag-quiz`, updates the homelab `FLAG_QUIZ_HOST` value from the `FLAG_DOMAIN` secret, and rebuilds the `flag-quiz` service through the sibling homelab Compose project.
+Pushes to `main` run CI. After CI succeeds, the deploy workflow synchronizes this repository to `/home/github/flag-quiz` and rebuilds its standalone Compose service. Like expense-tracking, it joins the host's existing `external_network`, where Traefik discovers the service labels. The homelab repository is not modified or invoked.
 
 Add these GitHub Actions secrets before merging to `main`:
 
