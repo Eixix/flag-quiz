@@ -22,17 +22,3 @@ Run all checks with:
 bun run check
 docker build -t flag-quiz .
 ```
-
-## Deployment
-
-Pushes to `main` run CI. After CI succeeds, the deploy workflow synchronizes this repository to `/home/github/flag-quiz` and rebuilds its standalone Compose service. Like expense-tracking, it joins the host's existing `external_network`, where Traefik discovers the service labels. The homelab repository is not modified or invoked.
-
-Add these GitHub Actions secrets before merging to `main`:
-
-- `WIREGUARD_CONF`
-- `SSH_HOST`
-- `SSH_KNOWN_HOSTS`
-- `DEPLOY_SECRET_KEY`
-- `FLAG_DOMAIN` (for example `flags.example.com`)
-
-No application secret is required: rooms are anonymous, ephemeral, and held in one server process. A restart clears active games.
