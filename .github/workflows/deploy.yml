@@ -1,0 +1,97 @@
+name: deploy
+
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: flag-quiz-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    env:
+      DEPLOY_HOST: ${{ secrets.SSH_HOST }}
+      DEPLOY_USER: github
+      APP_PATH: /home/github/flag-quiz
+      HOMELAB_PATH: /home/github/homelab
+      FLAG_DOMAIN: ${{ secrets.FLAG_DOMAIN }}
+    steps:
+      - name: Connect WireGuard
+        env:
+          WIREGUARD_CONF: ${{ secrets.WIREGUARD_CONF }}
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes wireguard-tools
+          sudo ln -sf "$(command -v resolvectl)" /usr/local/bin/resolvconf
+          umask 077
+          printf '%s' "$WIREGUARD_CONF" > "$RUNNER_TEMP/wg0.conf"
+          sudo wg-quick up "$RUNNER_TEMP/wg0.conf"
+
+      - name: Configure SSH
+        env:
+          DEPLOY_SECRET_KEY: ${{ secrets.DEPLOY_SECRET_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -d -m 700 "$HOME/.ssh"
+          umask 077
+          printf '%s\n' "$DEPLOY_SECRET_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
+          ssh-keygen -y -f "$HOME/.ssh/id_ed25519" >/dev/null
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Synchronize application source
+        run: |
+          set -euo pipefail
+          ssh "$DEPLOY_USER@$DEPLOY_HOST" "install -d '$APP_PATH'"
+          rsync -az --delete --delete-delay \
+            --exclude='/.git/' --exclude='/.env' --exclude='/node_modules/' --exclude='/dist/' \
+            ./ "$DEPLOY_USER@$DEPLOY_HOST:$APP_PATH/"
+
+      - name: Rebuild through homelab Compose
+        run: |
+          set -euo pipefail
+          if [[ ! "$FLAG_DOMAIN" =~ ^[a-zA-Z0-9.-]+$ ]]; then
+            echo 'FLAG_DOMAIN must be a plain hostname.' >&2
+            exit 1
+          fi
+          FLAG_DOMAIN_B64="$(printf '%s' "$FLAG_DOMAIN" | base64 -w 0)"
+          ssh "$DEPLOY_USER@$DEPLOY_HOST" "FLAG_DOMAIN_B64='$FLAG_DOMAIN_B64' HOMELAB_PATH='$HOMELAB_PATH' bash -s" <<'REMOTE'
+            set -euo pipefail
+            cd "$HOMELAB_PATH"
+            flag_domain="$(printf '%s' "$FLAG_DOMAIN_B64" | base64 --decode)"
+            awk -v value="$flag_domain" '
+              BEGIN { found = 0 }
+              /^FLAG_QUIZ_HOST=/ { print "FLAG_QUIZ_HOST=" value; found = 1; next }
+              { print }
+              END { if (!found) print "FLAG_QUIZ_HOST=" value }
+            ' .env > .env.tmp
+            chmod --reference=.env .env.tmp
+            mv .env.tmp .env
+            docker compose --env-file .env --profile external config --quiet
+            docker compose --env-file .env --profile external build --pull flag-quiz
+            docker compose --env-file .env --profile external up -d flag-quiz
+          REMOTE
+
+      - name: Verify public application
+        run: curl --fail --show-error --silent --retry 12 --retry-all-errors --retry-delay 5 "https://${FLAG_DOMAIN}/healthz"
+
+      - name: Disconnect WireGuard
+        if: always()
+        run: |
+          if [[ -f "$RUNNER_TEMP/wg0.conf" ]]; then
+            sudo wg-quick down "$RUNNER_TEMP/wg0.conf" || true
+          fi

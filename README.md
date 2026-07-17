@@ -1,1 +1,38 @@
-# This will be a react flag quiz PWA
+# Flag Quiz
+
+A real-time two-player flag race. One player creates a five-character room code, a friend joins, and both have 30 seconds to identify as many flags as possible.
+
+The Bun server owns rooms, timers, answer validation, scores, and winners. The React client communicates over a same-origin WebSocket at `/ws`; there is no third-party PeerJS server or client-trusted game state.
+
+## Develop
+
+Requires Bun 1.3.14 or newer.
+
+```bash
+bun install
+bun run build
+bun run dev
+```
+
+Open <http://localhost:3000>. For frontend hot reload, run `bun run dev:web` in a second terminal and open <http://localhost:5173>.
+
+Run all checks with:
+
+```bash
+bun run check
+docker build -t flag-quiz .
+```
+
+## Deployment
+
+Pushes to `main` run CI. After CI succeeds, the deploy workflow synchronizes this repository to `/home/github/flag-quiz`, updates the homelab `FLAG_QUIZ_HOST` value from the `FLAG_DOMAIN` secret, and rebuilds the `flag-quiz` service through the sibling homelab Compose project.
+
+Add these GitHub Actions secrets before merging to `main`:
+
+- `WIREGUARD_CONF`
+- `SSH_HOST`
+- `SSH_KNOWN_HOSTS`
+- `DEPLOY_SECRET_KEY`
+- `FLAG_DOMAIN` (for example `flags.example.com`)
+
+No application secret is required: rooms are anonymous, ephemeral, and held in one server process. A restart clears active games.
