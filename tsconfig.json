@@ -15,7 +15,7 @@
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
-    "types": ["bun-types"]
+    "types": ["bun-types", "vite/client"]
   },
   "include": ["src", "server", "vite.config.ts"]
 }

@@ -9,7 +9,9 @@ export type RoomState = {
   question?: string;
   deadline?: number;
   winnerIds?: string[];
-  skipsLeft?: number;
+  skipVotes?: number;
+  skipVotesRequired?: number;
+  hasVotedToSkip?: boolean;
 };
 
 export type ServerMessage =

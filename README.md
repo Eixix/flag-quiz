@@ -1,6 +1,6 @@
 # Flag Quiz
 
-A real-time two-player flag race. One player creates a five-character room code, a friend joins, and both have 30 seconds to identify as many flags as possible.
+A real-time multiplayer flag race. One player creates a five-character room code, friends join, and everyone has 30 seconds to identify as many shared flags as possible.
 
 The Bun server owns rooms, timers, answer validation, scores, and winners. The React client communicates over a same-origin WebSocket at `/ws`; there is no third-party PeerJS server or client-trusted game state.
 

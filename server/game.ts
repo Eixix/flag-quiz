@@ -2,12 +2,12 @@ import flags from "../src/res/countryFlags.json";
 import type { ClientMessage, Player, RoomState } from "../src/protocol";
 
 export const ROUND_SECONDS = 30;
-export const MAX_PLAYERS = 2;
+export const MAX_PLAYERS = 12;
 const ROOM_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
 export type SocketLike = { send(data: string): void };
-type InternalPlayer = Player & { socket: SocketLike; question?: string; remaining: string[]; skipsLeft: number };
-export type Room = { code: string; ownerId: string; phase: RoomState["phase"]; players: Map<string, InternalPlayer>; deadline?: number; timer?: Timer; winnerIds?: string[] };
+type InternalPlayer = Player & { socket: SocketLike };
+export type Room = { code: string; ownerId: string; phase: RoomState["phase"]; players: Map<string, InternalPlayer>; question?: string; remaining: string[]; skipVotes: Set<string>; deadline?: number; timer?: Timer; winnerIds?: string[] };
 
 export class GameServer {
   readonly rooms = new Map<string, Room>();
@@ -37,7 +37,10 @@ export class GameServer {
       if (room.ownerId === playerId) room.ownerId = room.players.keys().next().value ?? "";
     }
     if (room.players.size === 0) this.deleteRoom(room);
-    else this.broadcast(room);
+    else {
+      this.advanceIfSkipUnanimous(room);
+      this.broadcast(room);
+    }
   }
 
   private createRoom(playerId: string, socket: SocketLike, rawName: string) {
@@ -45,7 +48,7 @@ export class GameServer {
     if (!name) return;
     let code = "";
     do code = Array.from({ length: 5 }, () => ROOM_ALPHABET[Math.floor(this.random() * ROOM_ALPHABET.length)]).join(""); while (this.rooms.has(code));
-    const room: Room = { code, ownerId: playerId, phase: "lobby", players: new Map() };
+    const room: Room = { code, ownerId: playerId, phase: "lobby", players: new Map(), remaining: [], skipVotes: new Set() };
     room.players.set(playerId, this.newPlayer(playerId, name, socket));
     this.rooms.set(code, room);
     this.playerRooms.set(playerId, code);
@@ -81,37 +84,37 @@ export class GameServer {
   private start(room: Room, playerId: string) {
     const player = room.players.get(playerId)!;
     if (room.ownerId !== playerId) return this.error(player.socket, "Only the host can start the game.");
-    if (room.players.size !== MAX_PLAYERS) return this.error(player.socket, "Two players are required.");
+    if (room.players.size < 2) return this.error(player.socket, "At least two players are required.");
     room.phase = "playing";
     room.deadline = Date.now() + ROUND_SECONDS * 1000;
     room.winnerIds = undefined;
+    room.remaining = Object.keys(flags);
+    room.skipVotes.clear();
     for (const participant of room.players.values()) {
       participant.score = 0;
-      participant.skipsLeft = 3;
-      participant.remaining = Object.keys(flags);
-      this.nextQuestion(participant);
     }
+    this.nextQuestion(room);
     room.timer = setTimeout(() => this.finish(room), ROUND_SECONDS * 1000);
     this.broadcast(room);
   }
 
   private answer(room: Room, playerId: string, rawAnswer: string) {
     const player = room.players.get(playerId)!;
-    if (room.phase !== "playing" || !player.question) return;
-    const accepted = flags[player.question as keyof typeof flags].some((solution) => isAnswerCorrect(rawAnswer, solution));
+    if (room.phase !== "playing" || !room.question) return;
+    const accepted = flags[room.question as keyof typeof flags].some((solution) => isAnswerCorrect(rawAnswer, solution));
     player.socket.send(JSON.stringify({ type: "answer", correct: accepted }));
     if (accepted) {
       player.score += 1;
-      this.nextQuestion(player);
+      this.nextQuestion(room);
       this.broadcast(room);
     }
   }
 
   private skip(room: Room, playerId: string) {
     const player = room.players.get(playerId)!;
-    if (room.phase !== "playing" || player.skipsLeft <= 0) return;
-    player.skipsLeft -= 1;
-    this.nextQuestion(player);
+    if (room.phase !== "playing" || room.skipVotes.has(playerId)) return;
+    room.skipVotes.add(playerId);
+    this.advanceIfSkipUnanimous(room);
     this.broadcast(room);
   }
 
@@ -132,10 +135,17 @@ export class GameServer {
     this.broadcast(room);
   }
 
-  private nextQuestion(player: InternalPlayer) {
-    if (!player.remaining.length) player.remaining = Object.keys(flags);
-    const index = Math.floor(this.random() * player.remaining.length);
-    player.question = player.remaining.splice(index, 1)[0];
+  private nextQuestion(room: Room) {
+    if (!room.remaining.length) room.remaining = Object.keys(flags);
+    const index = Math.floor(this.random() * room.remaining.length);
+    room.question = room.remaining.splice(index, 1)[0];
+    room.skipVotes.clear();
+  }
+
+  private advanceIfSkipUnanimous(room: Room) {
+    if (room.phase !== "playing") return;
+    const connectedIds = [...room.players.values()].filter((player) => player.connected).map((player) => player.id);
+    if (connectedIds.length > 0 && connectedIds.every((id) => room.skipVotes.has(id))) this.nextQuestion(room);
   }
 
   private broadcast(room: Room) {
@@ -144,15 +154,17 @@ export class GameServer {
         type: "state", roomCode: room.code, phase: room.phase, ownerId: room.ownerId,
         players: [...room.players.values()].map(({ id, name, score, connected }) => ({ id, name, score, connected })),
         deadline: room.deadline, winnerIds: room.winnerIds,
-        question: room.phase === "playing" ? viewer.question : undefined,
-        skipsLeft: room.phase === "playing" ? viewer.skipsLeft : undefined,
+        question: room.phase === "playing" ? room.question : undefined,
+        skipVotes: room.phase === "playing" ? room.skipVotes.size : undefined,
+        skipVotesRequired: room.phase === "playing" ? [...room.players.values()].filter((player) => player.connected).length : undefined,
+        hasVotedToSkip: room.phase === "playing" ? room.skipVotes.has(viewer.id) : undefined,
       };
       viewer.socket.send(JSON.stringify(state));
     }
   }
 
   private roomFor(playerId: string) { const code = this.playerRooms.get(playerId); return code ? this.rooms.get(code) : undefined; }
-  private newPlayer(id: string, name: string, socket: SocketLike): InternalPlayer { return { id, name, socket, score: 0, connected: true, remaining: [], skipsLeft: 3 }; }
+  private newPlayer(id: string, name: string, socket: SocketLike): InternalPlayer { return { id, name, socket, score: 0, connected: true }; }
   private validName(raw: string, socket: SocketLike) { const name = raw.trim().replace(/\s+/g, " "); if (name.length < 2 || name.length > 24) { this.error(socket, "Name must be between 2 and 24 characters."); return; } return name; }
   private error(socket: SocketLike, message: string) { socket.send(JSON.stringify({ type: "error", message })); }
   private deleteRoom(room: Room) { if (room.timer) clearTimeout(room.timer); this.rooms.delete(room.code); }

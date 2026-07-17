@@ -2,6 +2,12 @@ import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import type { ClientMessage, RoomState, ServerMessage } from "./protocol";
 
 const websocketUrl = () => `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`;
+const flagImages = import.meta.glob("../node_modules/svg-country-flags/svg/*.svg", {
+  eager: true,
+  query: "?url",
+  import: "default",
+}) as Record<string, string>;
+const flagUrl = (code?: string) => code ? flagImages[`../node_modules/svg-country-flags/svg/${code.toLowerCase()}.svg`] : undefined;
 
 export default function App() {
   const socket = useRef<WebSocket | null>(null);
@@ -75,9 +81,11 @@ export default function App() {
   return <Shell connection={connection}><section className="game">
     <header className="game-header"><div><span className="eyebrow">Room {room.roomCode}</span><strong>{me?.score ?? 0} points</strong></div><div className={seconds <= 5 ? "timer urgent" : "timer"}>{seconds}s</div></header>
     <Scoreboard room={room} playerId={playerId} />
-    <div className="flag-card"><span className={`fi fi-${room.question?.toLowerCase()}`} aria-label="Flag to identify" /></div>
+    <div className="flag-card"><img src={flagUrl(room.question)} alt="Flag to identify" /></div>
     <AnswerForm result={answerResult} onAnswer={(answer) => send({ type: "answer", answer })} />
-    <button className="secondary" disabled={!room.skipsLeft} onClick={() => send({ type: "skip" })}>Skip flag · {room.skipsLeft ?? 0} left</button>
+    <button className="secondary" disabled={room.hasVotedToSkip} onClick={() => send({ type: "skip" })}>
+      {room.hasVotedToSkip ? "Waiting for everyone" : "Vote to skip"} · {room.skipVotes ?? 0}/{room.skipVotesRequired ?? room.players.length}
+    </button>
     {error && <p className="error" role="alert">{error}</p>}
   </section></Shell>;
 }
@@ -86,7 +94,7 @@ function Home({ connection, error, send }: { connection: string; error: string; 
   const [name, setName] = useState("");
   const [code, setCode] = useState(new URLSearchParams(location.search).get("room")?.toUpperCase() ?? "");
   const submit = (event: FormEvent, type: "create" | "join") => { event.preventDefault(); send(type === "create" ? { type: "create_room", name } : { type: "join_room", name, roomCode: code }); };
-  return <Shell connection={connection}><section className="hero"><div className="globe">🌎</div><p className="eyebrow">Two players · thirty seconds</p><h1>How well do you<br /><em>know the world?</em></h1><p className="lede">Race a friend to name as many flags as you can.</p></section><section className="card home-card">
+  return <Shell connection={connection}><section className="hero"><div className="globe">🌎</div><p className="eyebrow">Multiplayer · thirty seconds</p><h1>How well do you<br /><em>know the world?</em></h1><p className="lede">Race your friends to name as many flags as you can.</p></section><section className="card home-card">
     <label>Your name<input value={name} maxLength={24} autoComplete="nickname" onChange={(e) => setName(e.target.value)} placeholder="e.g. Tobias" /></label>
     <form onSubmit={(e) => submit(e, "create")}><button className="primary" disabled={!name.trim() || connection !== "online"}>Create a game</button></form>
     <div className="divider"><span>or join one</span></div>

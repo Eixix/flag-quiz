@@ -13,27 +13,40 @@ describe("answer matching", () => {
 });
 
 describe("rooms", () => {
-  test("creates, joins and starts an authoritative game", () => {
+  test("supports multiple players with one shared question", () => {
     const game = new GameServer(() => 0);
-    const host = socket(), guest = socket();
+    const host = socket(), guest = socket(), third = socket();
     game.handle("host", host, { type: "create_room", name: "Host" });
     const code = host.messages.at(-1).roomCode;
     game.handle("guest", guest, { type: "join_room", name: "Guest", roomCode: code });
+    game.handle("third", third, { type: "join_room", name: "Third", roomCode: code });
     game.handle("host", host, { type: "start_game" });
     expect(host.messages.at(-1).phase).toBe("playing");
-    expect(guest.messages.at(-1).question).toBeString();
-    expect(host.messages.at(-1).players).toHaveLength(2);
+    expect(host.messages.at(-1).question).toBe(guest.messages.at(-1).question);
+    expect(guest.messages.at(-1).question).toBe(third.messages.at(-1).question);
+    expect(host.messages.at(-1).players).toHaveLength(3);
+
+    game.handle("host", host, { type: "answer", answer: "Afghanistan" });
+    expect(host.messages.at(-1).question).toBe("AL");
+    expect(guest.messages.at(-1).question).toBe("AL");
+    expect(host.messages.at(-1).players.find((player: any) => player.id === "host").score).toBe(1);
   });
 
-  test("rejects unknown and full rooms", () => {
+  test("only skips after every connected player agrees", () => {
     const game = new GameServer(() => 0);
     const one = socket(), two = socket(), three = socket();
-    game.handle("missing", one, { type: "join_room", name: "One", roomCode: "NOPE1" });
-    expect(one.messages.at(-1).type).toBe("error");
     game.handle("one", one, { type: "create_room", name: "One" });
     const code = one.messages.at(-1).roomCode;
     game.handle("two", two, { type: "join_room", name: "Two", roomCode: code });
     game.handle("three", three, { type: "join_room", name: "Three", roomCode: code });
-    expect(three.messages.at(-1).message).toContain("full");
+    game.handle("one", one, { type: "start_game" });
+    expect(one.messages.at(-1).question).toBe("AF");
+    game.handle("one", one, { type: "skip" });
+    game.handle("two", two, { type: "skip" });
+    expect(one.messages.at(-1).question).toBe("AF");
+    expect(one.messages.at(-1).skipVotes).toBe(2);
+    game.handle("three", three, { type: "skip" });
+    expect(one.messages.at(-1).question).toBe("AL");
+    expect(one.messages.at(-1).skipVotes).toBe(0);
   });
 });
