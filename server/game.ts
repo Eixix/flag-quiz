@@ -1,26 +1,29 @@
 import flags from "../src/res/countryFlags.json";
-import type { ClientMessage, Player, RoomState } from "../src/protocol";
+import { GAME_CONFIG } from "../src/gameConfig";
+import type { ClientMessage, GameMode, Player, RoomState } from "../src/protocol";
 
-export const ROUND_SECONDS = 30;
+export const DEFAULT_ROUND_SECONDS = GAME_CONFIG.defaultDurationSeconds;
+export const DEFAULT_TARGET_SCORE = GAME_CONFIG.defaultTargetScore;
+export const COUNTDOWN_SECONDS = GAME_CONFIG.countdownSeconds;
 export const MAX_PLAYERS = 12;
 const ROOM_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
 export type SocketLike = { send(data: string): void };
 type InternalPlayer = Player & { socket: SocketLike };
-export type Room = { code: string; ownerId: string; phase: RoomState["phase"]; players: Map<string, InternalPlayer>; question?: string; remaining: string[]; skipVotes: Set<string>; deadline?: number; timer?: Timer; winnerIds?: string[] };
+export type Room = { code: string; ownerId: string; phase: RoomState["phase"]; players: Map<string, InternalPlayer>; question?: string; remaining: string[]; skipVotes: Set<string>; deadline?: number; timer?: Timer; countdownTimer?: Timer; winnerIds?: string[]; mode?: GameMode; targetScore?: number; durationSeconds?: number; countdownUntil?: number };
 
 export class GameServer {
   readonly rooms = new Map<string, Room>();
   private playerRooms = new Map<string, string>();
 
-  constructor(private random = Math.random) {}
+  constructor(private random = Math.random, private countdownSeconds: number = COUNTDOWN_SECONDS) {}
 
   handle(playerId: string, socket: SocketLike, message: ClientMessage) {
     if (message.type === "create_room") return this.createRoom(playerId, socket, message.name);
     if (message.type === "join_room") return this.joinRoom(playerId, socket, message.name, message.roomCode);
     const room = this.roomFor(playerId);
     if (!room) return this.error(socket, "Create or join a room first.");
-    if (message.type === "start_game") return this.start(room, playerId);
+    if (message.type === "start_game") return this.start(room, playerId, message.mode, message.targetScore, message.durationSeconds);
     if (message.type === "answer") return this.answer(room, playerId, message.answer, message.question, message.final ?? false);
     if (message.type === "skip") return this.skip(room, playerId);
     if (message.type === "play_again") return this.reset(room, playerId);
@@ -81,12 +84,15 @@ export class GameServer {
     this.broadcast(room);
   }
 
-  private start(room: Room, playerId: string) {
+  private start(room: Room, playerId: string, mode: GameMode | undefined, rawTarget?: number, rawDuration?: number) {
     const player = room.players.get(playerId)!;
     if (room.ownerId !== playerId) return this.error(player.socket, "Only the host can start the game.");
     if (room.players.size < 2) return this.error(player.socket, "At least two players are required.");
     room.phase = "playing";
-    room.deadline = Date.now() + ROUND_SECONDS * 1000;
+    room.mode = mode === "timed" ? "timed" : "first_to";
+    room.targetScore = clampInteger(rawTarget, DEFAULT_TARGET_SCORE, GAME_CONFIG.minTargetScore, GAME_CONFIG.maxTargetScore);
+    room.durationSeconds = clampInteger(rawDuration, DEFAULT_ROUND_SECONDS, GAME_CONFIG.minDurationSeconds, GAME_CONFIG.maxDurationSeconds);
+    room.deadline = undefined;
     room.winnerIds = undefined;
     room.remaining = Object.keys(flags);
     room.skipVotes.clear();
@@ -94,25 +100,27 @@ export class GameServer {
       participant.score = 0;
     }
     this.nextQuestion(room);
-    room.timer = setTimeout(() => this.finish(room), ROUND_SECONDS * 1000);
+    this.beginCountdown(room, true);
     this.broadcast(room);
   }
 
   private answer(room: Room, playerId: string, rawAnswer: string, question: string, final: boolean) {
     const player = room.players.get(playerId)!;
-    if (room.phase !== "playing" || !room.question || question !== room.question) return;
+    if (room.phase !== "playing" || room.countdownUntil || !room.question || question !== room.question) return;
     const accepted = isAcceptedAnswer(rawAnswer, room.question);
     if (accepted || final) player.socket.send(JSON.stringify({ type: "answer", correct: accepted }));
     if (accepted) {
       player.score += 1;
+      if (room.mode === "first_to" && player.score >= (room.targetScore ?? DEFAULT_TARGET_SCORE)) return this.finish(room);
       this.nextQuestion(room);
+      this.beginCountdown(room, false);
       this.broadcast(room);
     }
   }
 
   private skip(room: Room, playerId: string) {
     const player = room.players.get(playerId)!;
-    if (room.phase !== "playing" || room.skipVotes.has(playerId)) return;
+    if (room.phase !== "playing" || room.countdownUntil || room.skipVotes.has(playerId)) return;
     room.skipVotes.add(playerId);
     this.advanceIfSkipUnanimous(room);
     this.broadcast(room);
@@ -121,6 +129,9 @@ export class GameServer {
   private finish(room: Room) {
     if (room.phase !== "playing") return;
     room.phase = "finished";
+    room.countdownUntil = undefined;
+    if (room.timer) clearTimeout(room.timer);
+    if (room.countdownTimer) clearTimeout(room.countdownTimer);
     const topScore = Math.max(...[...room.players.values()].map((player) => player.score));
     room.winnerIds = [...room.players.values()].filter((player) => player.score === topScore).map((player) => player.id);
     this.broadcast(room);
@@ -129,8 +140,10 @@ export class GameServer {
   private reset(room: Room, playerId: string) {
     if (room.ownerId !== playerId) return;
     if (room.timer) clearTimeout(room.timer);
+    if (room.countdownTimer) clearTimeout(room.countdownTimer);
     room.phase = "lobby";
     room.deadline = undefined;
+    room.countdownUntil = undefined;
     room.winnerIds = undefined;
     this.broadcast(room);
   }
@@ -143,9 +156,30 @@ export class GameServer {
   }
 
   private advanceIfSkipUnanimous(room: Room) {
-    if (room.phase !== "playing") return;
+    if (room.phase !== "playing" || room.countdownUntil) return;
     const connectedIds = [...room.players.values()].filter((player) => player.connected).map((player) => player.id);
-    if (connectedIds.length > 0 && connectedIds.every((id) => room.skipVotes.has(id))) this.nextQuestion(room);
+    if (connectedIds.length > 0 && connectedIds.every((id) => room.skipVotes.has(id))) {
+      this.nextQuestion(room);
+      this.beginCountdown(room, false);
+    }
+  }
+
+  private beginCountdown(room: Room, startsTimedGame: boolean) {
+    if (room.countdownTimer) clearTimeout(room.countdownTimer);
+    if (this.countdownSeconds <= 0) return this.endCountdown(room, startsTimedGame);
+    room.countdownUntil = Date.now() + this.countdownSeconds * 1000;
+    room.countdownTimer = setTimeout(() => this.endCountdown(room, startsTimedGame), this.countdownSeconds * 1000);
+  }
+
+  private endCountdown(room: Room, startsTimedGame: boolean) {
+      if (room.phase !== "playing") return;
+      room.countdownUntil = undefined;
+      room.countdownTimer = undefined;
+      if (startsTimedGame && room.mode === "timed") {
+        room.deadline = Date.now() + (room.durationSeconds ?? DEFAULT_ROUND_SECONDS) * 1000;
+        room.timer = setTimeout(() => this.finish(room), (room.durationSeconds ?? DEFAULT_ROUND_SECONDS) * 1000);
+      }
+      this.broadcast(room);
   }
 
   private broadcast(room: Room) {
@@ -154,6 +188,8 @@ export class GameServer {
         type: "state", roomCode: room.code, phase: room.phase, ownerId: room.ownerId,
         players: [...room.players.values()].map(({ id, name, score, connected }) => ({ id, name, score, connected })),
         deadline: room.deadline, winnerIds: room.winnerIds,
+        mode: room.mode, targetScore: room.targetScore, durationSeconds: room.durationSeconds,
+        countdownUntil: room.phase === "playing" ? room.countdownUntil : undefined,
         question: room.phase === "playing" ? room.question : undefined,
         skipVotes: room.phase === "playing" ? room.skipVotes.size : undefined,
         skipVotesRequired: room.phase === "playing" ? [...room.players.values()].filter((player) => player.connected).length : undefined,
@@ -167,7 +203,11 @@ export class GameServer {
   private newPlayer(id: string, name: string, socket: SocketLike): InternalPlayer { return { id, name, socket, score: 0, connected: true }; }
   private validName(raw: string, socket: SocketLike) { const name = raw.trim().replace(/\s+/g, " "); if (name.length < 2 || name.length > 24) { this.error(socket, "Name must be between 2 and 24 characters."); return; } return name; }
   private error(socket: SocketLike, message: string) { socket.send(JSON.stringify({ type: "error", message })); }
-  private deleteRoom(room: Room) { if (room.timer) clearTimeout(room.timer); this.rooms.delete(room.code); }
+  private deleteRoom(room: Room) { if (room.timer) clearTimeout(room.timer); if (room.countdownTimer) clearTimeout(room.countdownTimer); this.rooms.delete(room.code); }
+}
+
+function clampInteger(value: number | undefined, fallback: number, min: number, max: number) {
+  return Number.isFinite(value) ? Math.min(max, Math.max(min, Math.round(value!))) : fallback;
 }
 
 export function normalizeAnswer(value: string) {

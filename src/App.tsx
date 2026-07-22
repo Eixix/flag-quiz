@@ -1,5 +1,6 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import type { ClientMessage, RoomState, ServerMessage } from "./protocol";
+import { GAME_CONFIG } from "./gameConfig";
+import type { ClientMessage, GameMode, RoomState, ServerMessage } from "./protocol";
 
 const websocketUrl = () => `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`;
 const flagImages = import.meta.glob("../node_modules/svg-country-flags/svg/*.svg", {
@@ -17,6 +18,7 @@ export default function App() {
   const [error, setError] = useState("");
   const [answerResult, setAnswerResult] = useState<boolean | null>(null);
   const [seconds, setSeconds] = useState(0);
+  const [countdown, setCountdown] = useState(0);
 
   useEffect(() => {
     const ws = new WebSocket(websocketUrl());
@@ -45,6 +47,14 @@ export default function App() {
     return () => window.clearInterval(timer);
   }, [room?.deadline, room?.phase]);
 
+  useEffect(() => {
+    if (!room?.countdownUntil || room.phase !== "playing") { setCountdown(0); return; }
+    const update = () => setCountdown(Math.max(0, Math.ceil((room.countdownUntil! - Date.now()) / 1000)));
+    update();
+    const timer = window.setInterval(update, 100);
+    return () => window.clearInterval(timer);
+  }, [room?.countdownUntil, room?.phase]);
+
   const send = useCallback((message: ClientMessage) => {
     if (socket.current?.readyState === WebSocket.OPEN) socket.current.send(JSON.stringify(message));
   }, []);
@@ -60,7 +70,7 @@ export default function App() {
         <p className="muted">Share this code with a friend. Tap it to copy.</p>
         <div className="players">{room.players.map((player) => <span key={player.id}>🌍 {player.name}</span>)}</div>
         {room.ownerId === playerId
-          ? <button className="primary" disabled={room.players.length < 2} onClick={() => send({ type: "start_game" })}>Start the round</button>
+          ? <GameSettings disabled={room.players.length < 2} onStart={(settings) => send({ type: "start_game", ...settings })} />
           : <p className="waiting">Waiting for the host to start…</p>}
         {error && <p className="error" role="alert">{error}</p>}
       </section>
@@ -79,15 +89,25 @@ export default function App() {
   }
 
   return <Shell connection={connection}><section className="game">
-    <header className="game-header"><div><span className="eyebrow">Room {room.roomCode}</span><strong>{me?.score ?? 0} points</strong></div><div className={seconds <= 5 ? "timer urgent" : "timer"}>{seconds}s</div></header>
+    <header className="game-header"><div><span className="eyebrow">Room {room.roomCode}</span><strong>{me?.score ?? 0} points {room.mode === "first_to" ? `/ ${room.targetScore}` : ""}</strong></div>{room.mode === "timed" && <div className={seconds <= 5 && room.deadline ? "timer urgent" : "timer"}>{room.deadline ? `${seconds}s` : "—"}</div>}</header>
     <Scoreboard room={room} playerId={playerId} />
-    <div className="flag-card"><img src={flagUrl(room.question)} alt="Flag to identify" /></div>
-    <AnswerForm question={room.question ?? ""} result={answerResult} onAnswer={(answer, final) => send({ type: "answer", answer, question: room.question ?? "", final })} />
-    <button className="secondary" disabled={room.hasVotedToSkip} onClick={() => send({ type: "skip" })}>
+    <div className="flag-card"><img src={flagUrl(room.question)} alt="Flag to identify" />{countdown > 0 && <div className="countdown" aria-live="assertive"><span>{countdown}</span><small>Get ready</small></div>}</div>
+    <AnswerForm disabled={countdown > 0} question={room.question ?? ""} result={answerResult} onAnswer={(answer, final) => send({ type: "answer", answer, question: room.question ?? "", final })} />
+    <button className="secondary" disabled={countdown > 0 || room.hasVotedToSkip} onClick={() => send({ type: "skip" })}>
       {room.hasVotedToSkip ? "Waiting for everyone" : "Vote to skip"} · {room.skipVotes ?? 0}/{room.skipVotesRequired ?? room.players.length}
     </button>
     {error && <p className="error" role="alert">{error}</p>}
   </section></Shell>;
+}
+
+function GameSettings({ disabled, onStart }: { disabled: boolean; onStart: (settings: { mode: GameMode; targetScore?: number; durationSeconds?: number }) => void }) {
+  const [mode, setMode] = useState<GameMode>("first_to");
+  const [targetScore, setTargetScore] = useState<number>(GAME_CONFIG.defaultTargetScore);
+  const [durationSeconds, setDurationSeconds] = useState<number>(GAME_CONFIG.defaultDurationSeconds);
+  return <div className="game-settings"><div className="mode-picker"><button className={mode === "first_to" ? "selected" : ""} onClick={() => setMode("first_to")}>First to</button><button className={mode === "timed" ? "selected" : ""} onClick={() => setMode("timed")}>Time mode</button></div>
+    <label>{mode === "first_to" ? "Points to win" : "Seconds"}<input type="number" min={mode === "first_to" ? GAME_CONFIG.minTargetScore : GAME_CONFIG.minDurationSeconds} max={mode === "first_to" ? GAME_CONFIG.maxTargetScore : GAME_CONFIG.maxDurationSeconds} value={mode === "first_to" ? targetScore : durationSeconds} onChange={(e) => mode === "first_to" ? setTargetScore(Number(e.target.value)) : setDurationSeconds(Number(e.target.value))} /></label>
+    <button className="primary" disabled={disabled} onClick={() => onStart({ mode, targetScore, durationSeconds })}>Start game</button>
+  </div>;
 }
 
 function Home({ connection, error, send }: { connection: string; error: string; send: (m: ClientMessage) => void }) {
@@ -103,10 +123,10 @@ function Home({ connection, error, send }: { connection: string; error: string; 
   </section></Shell>;
 }
 
-function AnswerForm({ question, result, onAnswer }: { question: string; result: boolean | null; onAnswer: (answer: string, final: boolean) => void }) {
+function AnswerForm({ question, result, disabled, onAnswer }: { question: string; result: boolean | null; disabled: boolean; onAnswer: (answer: string, final: boolean) => void }) {
   const [answer, setAnswer] = useState("");
   useEffect(() => setAnswer(""), [question]);
-  return <form className={`answer ${result === true ? "correct" : result === false ? "wrong" : ""}`} onSubmit={(event) => { event.preventDefault(); if (answer.trim()) onAnswer(answer, true); }}><input autoFocus value={answer} onChange={(e) => { const value = e.target.value; setAnswer(value); if (value.trim()) onAnswer(value, false); }} placeholder="Type the country…" autoComplete="off" /><button className="primary">Submit</button></form>;
+  return <form className={`answer ${result === true ? "correct" : result === false ? "wrong" : ""}`} onSubmit={(event) => { event.preventDefault(); if (!disabled && answer.trim()) onAnswer(answer, true); }}><input autoFocus disabled={disabled} value={answer} onChange={(e) => { const value = e.target.value; setAnswer(value); if (!disabled && value.trim()) onAnswer(value, false); }} placeholder={disabled ? "Get ready…" : "Type the country…"} autoComplete="off" /><button disabled={disabled} className="primary">Submit</button></form>;
 }
 
 function Scoreboard({ room, playerId }: { room: RoomState; playerId: string }) {

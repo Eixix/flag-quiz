@@ -1,4 +1,5 @@
 export type Player = { id: string; name: string; score: number; connected: boolean };
+export type GameMode = "first_to" | "timed";
 
 export type RoomState = {
   type: "state";
@@ -9,6 +10,10 @@ export type RoomState = {
   question?: string;
   deadline?: number;
   winnerIds?: string[];
+  mode?: GameMode;
+  targetScore?: number;
+  durationSeconds?: number;
+  countdownUntil?: number;
   skipVotes?: number;
   skipVotesRequired?: number;
   hasVotedToSkip?: boolean;
@@ -23,7 +28,7 @@ export type ServerMessage =
 export type ClientMessage =
   | { type: "create_room"; name: string }
   | { type: "join_room"; name: string; roomCode: string }
-  | { type: "start_game" }
+  | { type: "start_game"; mode?: GameMode; targetScore?: number; durationSeconds?: number }
   | { type: "answer"; answer: string; question: string; final?: boolean }
   | { type: "skip" }
   | { type: "play_again" };

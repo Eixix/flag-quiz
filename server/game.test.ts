@@ -24,7 +24,7 @@ describe("answer matching", () => {
 
 describe("rooms", () => {
   test("supports multiple players with one shared question", () => {
-    const game = new GameServer(() => 0);
+    const game = new GameServer(() => 0, 0);
     const host = socket(), guest = socket(), third = socket();
     game.handle("host", host, { type: "create_room", name: "Host" });
     const code = host.messages.at(-1).roomCode;
@@ -46,7 +46,7 @@ describe("rooms", () => {
   });
 
   test("only skips after every connected player agrees", () => {
-    const game = new GameServer(() => 0);
+    const game = new GameServer(() => 0, 0);
     const one = socket(), two = socket(), three = socket();
     game.handle("one", one, { type: "create_room", name: "One" });
     const code = one.messages.at(-1).roomCode;
@@ -61,5 +61,17 @@ describe("rooms", () => {
     game.handle("three", three, { type: "skip" });
     expect(one.messages.at(-1).question).toBe("AL");
     expect(one.messages.at(-1).skipVotes).toBe(0);
+  });
+
+  test("finishes first-to mode at the configured target", () => {
+    const game = new GameServer(() => 0, 0);
+    const host = socket(), guest = socket();
+    game.handle("host", host, { type: "create_room", name: "Host" });
+    const code = host.messages.at(-1).roomCode;
+    game.handle("guest", guest, { type: "join_room", name: "Guest", roomCode: code });
+    game.handle("host", host, { type: "start_game", mode: "first_to", targetScore: 1 });
+    game.handle("host", host, { type: "answer", answer: "Afghanistan", question: "AF" });
+    expect(host.messages.at(-1).phase).toBe("finished");
+    expect(host.messages.at(-1).winnerIds).toEqual(["host"]);
   });
 });
