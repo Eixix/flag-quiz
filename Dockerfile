@@ -11,6 +11,7 @@ ENV NODE_ENV=production PORT=3000
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/server ./server
 COPY --from=build /app/src/protocol.ts ./src/protocol.ts
+COPY --from=build /app/src/gameConfig.ts ./src/gameConfig.ts
 COPY --from=build /app/src/res ./src/res
 EXPOSE 3000
 USER bun
