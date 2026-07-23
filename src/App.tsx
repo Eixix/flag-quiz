@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { createContext, FormEvent, useCallback, useContext, useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
 import { GAME_CONFIG } from "./gameConfig";
 import type { ClientMessage, Difficulty, GameMode, RoomState, ServerMessage } from "./protocol";
@@ -7,14 +7,88 @@ const websocketUrl = () => `${location.protocol === "https:" ? "wss" : "ws"}://$
 /** Resolves an answer-data code to its locally cached FlagCDN asset. */
 const flagUrl = (code?: string) => code ? `/flags/${code.toLowerCase()}.svg` : undefined;
 
+type Language = "en" | "de";
+const EN = {
+  online: "online", connecting: "connecting", offline: "offline",
+  gameCode: "Your game code", shareCode: "Share this code or let a friend scan the QR code.",
+  qrLoading: "QR code is being generated", copyLink: "Copy join link",
+  waitingHostStart: "Waiting for the host to start…", waitingHost: "Waiting for the host…",
+  startGame: "Start game", firstTo: "First to", timeMode: "Time mode",
+  pointsToWin: "Points to win", seconds: "Seconds", familiarFlags: "54 familiar flags",
+  countries: "196 countries", countriesTerritories: "250 countries & territories",
+  explorer: "Explorer", world: "World", expert: "Expert",
+  roundComplete: "Round complete", won: "You won!", goodGame: "Good game!", playAgain: "Play again",
+  room: "Room", points: "points", flagAlt: "Flag to identify", getReady: "Get ready",
+  waitingEveryone: "Waiting for everyone", voteSkip: "Vote to skip",
+  heroStatus: "Multiplayer / live session", heroTitle: "How well do you", heroAccent: "know the world?",
+  heroText: "Race your friends through the world’s flags. One shared question, one synchronized countdown.",
+  yourName: "Your name", namePlaceholder: "e.g. Tobias", createGame: "Create a game",
+  joinDivider: "or join one", roomCode: "ROOM CODE", join: "Join",
+  connectionLost: "Connection lost. Refresh to try again.", readyPlaceholder: "Get ready…",
+  answerPlaceholder: "Type the country…", submit: "Submit", offlinePlayer: "offline",
+  footer: "Built for curious minds · Hexagons are bestagons.", flagsBy: "Flags by",
+  imprint: "Imprint", privacy: "Privacy", language: "Deutsch",
+} as const;
+type TranslationKey = keyof typeof EN;
+const DE: Record<TranslationKey, string> = {
+  online: "online", connecting: "verbindet", offline: "offline",
+  gameCode: "Dein Spielcode", shareCode: "Teile diesen Code oder lass Freunde den QR-Code scannen.",
+  qrLoading: "QR-Code wird erstellt", copyLink: "Beitrittslink kopieren",
+  waitingHostStart: "Warte, bis der Host das Spiel startet…", waitingHost: "Warte auf den Host…",
+  startGame: "Spiel starten", firstTo: "Zuerst bei", timeMode: "Zeitmodus",
+  pointsToWin: "Punkte zum Sieg", seconds: "Sekunden", familiarFlags: "54 bekannte Flaggen",
+  countries: "196 Länder", countriesTerritories: "250 Länder & Gebiete",
+  explorer: "Entdecker", world: "Welt", expert: "Experte",
+  roundComplete: "Runde beendet", won: "Du hast gewonnen!", goodGame: "Gutes Spiel!", playAgain: "Nochmal spielen",
+  room: "Raum", points: "Punkte", flagAlt: "Zu erratende Flagge", getReady: "Mach dich bereit",
+  waitingEveryone: "Warte auf alle", voteSkip: "Überspringen",
+  heroStatus: "Mehrspieler / Live-Runde", heroTitle: "Wie gut kennst du", heroAccent: "die Welt?",
+  heroText: "Tritt gegen Freunde mit Flaggen aus aller Welt an. Eine gemeinsame Frage, ein synchroner Countdown.",
+  yourName: "Dein Name", namePlaceholder: "z. B. Tobias", createGame: "Spiel erstellen",
+  joinDivider: "oder beitreten", roomCode: "RAUMCODE", join: "Beitreten",
+  connectionLost: "Verbindung verloren. Aktualisiere die Seite.", readyPlaceholder: "Mach dich bereit…",
+  answerPlaceholder: "Land eingeben…", submit: "Absenden", offlinePlayer: "offline",
+  footer: "Für neugierige Köpfe · Hexagons are bestagons.", flagsBy: "Flaggen von",
+  imprint: "Impressum", privacy: "Datenschutz", language: "English",
+};
+const I18nContext = createContext({ language: "en" as Language, setLanguage: (_language: Language) => {} });
+function useI18n() {
+  const { language, setLanguage } = useContext(I18nContext);
+  const copy = language === "de" ? DE : EN;
+  return { language, setLanguage, t: (key: TranslationKey) => copy[key] };
+}
+
 export default function App() {
   const legalPage = location.pathname.replace(/\/+$/, "");
   if (legalPage === "/impressum") return <LegalPage type="imprint" />;
   if (legalPage === "/datenschutz") return <LegalPage type="privacy" />;
-  return <GameApp />;
+  return <LocalizedGame />;
 }
 
+function LocalizedGame() {
+  const [language, setLanguage] = useState<Language>(() => navigator.language.toLowerCase().startsWith("de") ? "de" : "en");
+  useEffect(() => {
+    document.documentElement.lang = language;
+    document.title = language === "de" ? "Flaggenquiz" : "Flag Quiz";
+  }, [language]);
+  return <I18nContext.Provider value={{ language, setLanguage }}><GameApp /></I18nContext.Provider>;
+}
+
+const SERVER_ERRORS_DE: Record<string, string> = {
+  "Create or join a room first.": "Erstelle zuerst einen Raum oder tritt einem bei.",
+  "That room does not exist.": "Dieser Raum existiert nicht.",
+  "That game has already started.": "Dieses Spiel hat bereits begonnen.",
+  "That room is full.": "Dieser Raum ist voll.",
+  "Choose a different name.": "Wähle einen anderen Namen.",
+  "Only the host can start the game.": "Nur der Host kann das Spiel starten.",
+  "At least two players are required.": "Mindestens zwei Spieler werden benötigt.",
+  "Name must be between 2 and 24 characters.": "Der Name muss zwischen 2 und 24 Zeichen lang sein.",
+  "Invalid message.": "Ungültige Nachricht.",
+};
+const localizeError = (message: string, language: Language) => language === "de" ? SERVER_ERRORS_DE[message] ?? message : message;
+
 function GameApp() {
+  const { language, t } = useI18n();
   const socket = useRef<WebSocket | null>(null);
   const [connection, setConnection] = useState<"connecting" | "online" | "offline">("connecting");
   const [playerId, setPlayerId] = useState("");
@@ -75,15 +149,15 @@ function GameApp() {
   if (room.phase === "lobby") return (
     <Shell connection={connection}>
       <section className="card lobby">
-        <p className="eyebrow">Your game code</p>
+        <p className="eyebrow">{t("gameCode")}</p>
         <button className="room-code" onClick={() => navigator.clipboard.writeText(room.roomCode)}>{room.roomCode}</button>
-        <p className="muted">Share this code or let a friend scan the QR code.</p>
+        <p className="muted">{t("shareCode")}</p>
         <RoomQrCode roomCode={room.roomCode} />
         <div className="players">{room.players.map((player) => <span key={player.id}>🌍 {player.name}</span>)}</div>
         {room.ownerId === playerId
           ? <GameSettings disabled={room.players.length < 2} onStart={(settings) => send({ type: "start_game", ...settings })} />
-          : <p className="waiting">Waiting for the host to start…</p>}
-        {error && <p className="error" role="alert">{error}</p>}
+          : <p className="waiting">{t("waitingHostStart")}</p>}
+        {error && <p className="error" role="alert">{localizeError(error, language)}</p>}
       </section>
     </Shell>
   );
@@ -92,26 +166,27 @@ function GameApp() {
     const won = room.winnerIds?.includes(playerId);
     return <Shell connection={connection}><section className="card result">
       <div className="result-emoji">{won ? "🏆" : "🗺️"}</div>
-      <p className="eyebrow">Round complete</p>
-      <h1>{won ? "You won!" : "Good game!"}</h1>
+      <p className="eyebrow">{t("roundComplete")}</p>
+      <h1>{won ? t("won") : t("goodGame")}</h1>
       <Scoreboard room={room} playerId={playerId} />
-      {room.ownerId === playerId ? <button className="primary" onClick={() => send({ type: "play_again" })}>Play again</button> : <p className="waiting">Waiting for the host…</p>}
+      {room.ownerId === playerId ? <button className="primary" onClick={() => send({ type: "play_again" })}>{t("playAgain")}</button> : <p className="waiting">{t("waitingHost")}</p>}
     </section></Shell>;
   }
 
   return <Shell connection={connection}><section className="game">
-    <header className="game-header"><div><span className="eyebrow">Room {room.roomCode} / {room.difficulty ?? "world"}</span><strong>{me?.score ?? 0} points {room.mode === "first_to" ? `/ ${room.targetScore}` : ""}</strong></div>{room.mode === "timed" && <div className={seconds <= 5 && room.deadline ? "timer urgent" : "timer"}>{room.deadline ? `${seconds}s` : "—"}</div>}</header>
+    <header className="game-header"><div><span className="eyebrow">{t("room")} {room.roomCode} / {t(room.difficulty ?? "world")}</span><strong>{me?.score ?? 0} {t("points")} {room.mode === "first_to" ? `/ ${room.targetScore}` : ""}</strong></div>{room.mode === "timed" && <div className={seconds <= 5 && room.deadline ? "timer urgent" : "timer"}>{room.deadline ? `${seconds}s` : "—"}</div>}</header>
     <Scoreboard room={room} playerId={playerId} />
-    <div className="flag-card"><img src={flagUrl(room.question)} alt="Flag to identify" />{countdown > 0 && <div className="countdown" aria-live="assertive"><span>{countdown}</span><small>Get ready</small></div>}</div>
+    <div className="flag-card"><img src={flagUrl(room.question)} alt={t("flagAlt")} />{countdown > 0 && <div className="countdown" aria-live="assertive"><span>{countdown}</span><small>{t("getReady")}</small></div>}</div>
     <AnswerForm disabled={countdown > 0} question={room.question ?? ""} result={answerResult} onAnswer={(answer, final) => send({ type: "answer", answer, question: room.question ?? "", final })} />
     <button className="secondary" disabled={countdown > 0 || room.hasVotedToSkip} onClick={() => send({ type: "skip" })}>
-      {room.hasVotedToSkip ? "Waiting for everyone" : "Vote to skip"} · {room.skipVotes ?? 0}/{room.skipVotesRequired ?? room.players.length}
+      {room.hasVotedToSkip ? t("waitingEveryone") : t("voteSkip")} · {room.skipVotes ?? 0}/{room.skipVotesRequired ?? room.players.length}
     </button>
-    {error && <p className="error" role="alert">{error}</p>}
+    {error && <p className="error" role="alert">{localizeError(error, language)}</p>}
   </section></Shell>;
 }
 
 function RoomQrCode({ roomCode }: { roomCode: string }) {
+  const { t } = useI18n();
   const joinUrl = `${location.origin}${location.pathname}?room=${encodeURIComponent(roomCode)}`;
   const [qrUrl, setQrUrl] = useState("");
   useEffect(() => {
@@ -130,46 +205,49 @@ function RoomQrCode({ roomCode }: { roomCode: string }) {
   return <div className="room-qr">
     {qrUrl
       ? <img src={qrUrl} width="180" height="180" alt={`QR code to join room ${roomCode}`} />
-      : <div className="qr-placeholder" aria-label="QR code is being generated" />}
-    <button className="secondary" onClick={() => navigator.clipboard.writeText(joinUrl)}>Copy join link</button>
+      : <div className="qr-placeholder" aria-label={t("qrLoading")} />}
+    <button className="secondary" onClick={() => navigator.clipboard.writeText(joinUrl)}>{t("copyLink")}</button>
   </div>;
 }
 
 function GameSettings({ disabled, onStart }: { disabled: boolean; onStart: (settings: { mode: GameMode; difficulty: Difficulty; targetScore?: number; durationSeconds?: number }) => void }) {
+  const { t } = useI18n();
   const [mode, setMode] = useState<GameMode>("first_to");
   const [difficulty, setDifficulty] = useState<Difficulty>("world");
   const [targetScore, setTargetScore] = useState<number>(GAME_CONFIG.defaultTargetScore);
   const [durationSeconds, setDurationSeconds] = useState<number>(GAME_CONFIG.defaultDurationSeconds);
   const difficultyCopy: Record<Difficulty, string> = {
-    explorer: "54 familiar flags",
-    world: "196 countries",
-    expert: "250 countries & territories",
+    explorer: t("familiarFlags"),
+    world: t("countries"),
+    expert: t("countriesTerritories"),
   };
   return <div className="game-settings">
     <div className="difficulty-picker" aria-label="Difficulty">
-      {(["explorer", "world", "expert"] as Difficulty[]).map((level) => <button key={level} className={difficulty === level ? "selected" : ""} onClick={() => setDifficulty(level)}>{level}</button>)}
+      {(["explorer", "world", "expert"] as Difficulty[]).map((level) => <button key={level} className={difficulty === level ? "selected" : ""} onClick={() => setDifficulty(level)}>{t(level)}</button>)}
     </div>
     <p className="setting-hint">{difficultyCopy[difficulty]}</p>
-    <div className="mode-picker"><button className={mode === "first_to" ? "selected" : ""} onClick={() => setMode("first_to")}>First to</button><button className={mode === "timed" ? "selected" : ""} onClick={() => setMode("timed")}>Time mode</button></div>
-    <label>{mode === "first_to" ? "Points to win" : "Seconds"}<input type="number" min={mode === "first_to" ? GAME_CONFIG.minTargetScore : GAME_CONFIG.minDurationSeconds} max={mode === "first_to" ? GAME_CONFIG.maxTargetScore : GAME_CONFIG.maxDurationSeconds} value={mode === "first_to" ? targetScore : durationSeconds} onChange={(e) => mode === "first_to" ? setTargetScore(Number(e.target.value)) : setDurationSeconds(Number(e.target.value))} /></label>
-    <button className="primary" disabled={disabled} onClick={() => onStart({ mode, difficulty, targetScore, durationSeconds })}>Start game</button>
+    <div className="mode-picker"><button className={mode === "first_to" ? "selected" : ""} onClick={() => setMode("first_to")}>{t("firstTo")}</button><button className={mode === "timed" ? "selected" : ""} onClick={() => setMode("timed")}>{t("timeMode")}</button></div>
+    <label>{mode === "first_to" ? t("pointsToWin") : t("seconds")}<input type="number" min={mode === "first_to" ? GAME_CONFIG.minTargetScore : GAME_CONFIG.minDurationSeconds} max={mode === "first_to" ? GAME_CONFIG.maxTargetScore : GAME_CONFIG.maxDurationSeconds} value={mode === "first_to" ? targetScore : durationSeconds} onChange={(e) => mode === "first_to" ? setTargetScore(Number(e.target.value)) : setDurationSeconds(Number(e.target.value))} /></label>
+    <button className="primary" disabled={disabled} onClick={() => onStart({ mode, difficulty, targetScore, durationSeconds })}>{t("startGame")}</button>
   </div>;
 }
 
-function Home({ connection, error, send }: { connection: string; error: string; send: (m: ClientMessage) => void }) {
+function Home({ connection, error, send }: { connection: "connecting" | "online" | "offline"; error: string; send: (m: ClientMessage) => void }) {
+  const { language, t } = useI18n();
   const [name, setName] = useState("");
   const [code, setCode] = useState(new URLSearchParams(location.search).get("room")?.toUpperCase() ?? "");
   const submit = (event: FormEvent, type: "create" | "join") => { event.preventDefault(); send(type === "create" ? { type: "create_room", name } : { type: "join_room", name, roomCode: code }); };
-  return <Shell connection={connection}><section className="hero"><div className="globe">🌎</div><p className="eyebrow">Multiplayer / live session</p><h1>How well do you<br /><em>know the world?</em></h1><p className="lede">Race your friends through the world’s flags. One shared question, one synchronized countdown.</p></section><section className="card home-card">
-    <label>Your name<input value={name} maxLength={24} autoComplete="nickname" onChange={(e) => setName(e.target.value)} placeholder="e.g. Tobias" /></label>
-    <form onSubmit={(e) => submit(e, "create")}><button className="primary" disabled={!name.trim() || connection !== "online"}>Create a game</button></form>
-    <div className="divider"><span>or join one</span></div>
-    <form className="join" onSubmit={(e) => submit(e, "join")}><input aria-label="Room code" value={code} maxLength={5} onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))} placeholder="ROOM CODE" /><button className="secondary" disabled={!name.trim() || code.length !== 5 || connection !== "online"}>Join</button></form>
-    {connection === "offline" && <p className="error">Connection lost. Refresh to try again.</p>}{error && <p className="error" role="alert">{error}</p>}
+  return <Shell connection={connection}><section className="hero"><div className="globe">🌎</div><p className="eyebrow">{t("heroStatus")}</p><h1>{t("heroTitle")}<br /><em>{t("heroAccent")}</em></h1><p className="lede">{t("heroText")}</p></section><section className="card home-card">
+    <label>{t("yourName")}<input value={name} maxLength={24} autoComplete="nickname" onChange={(e) => setName(e.target.value)} placeholder={t("namePlaceholder")} /></label>
+    <form onSubmit={(e) => submit(e, "create")}><button className="primary" disabled={!name.trim() || connection !== "online"}>{t("createGame")}</button></form>
+    <div className="divider"><span>{t("joinDivider")}</span></div>
+    <form className="join" onSubmit={(e) => submit(e, "join")}><input aria-label={t("roomCode")} value={code} maxLength={5} onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))} placeholder={t("roomCode")} /><button className="secondary" disabled={!name.trim() || code.length !== 5 || connection !== "online"}>{t("join")}</button></form>
+    {connection === "offline" && <p className="error">{t("connectionLost")}</p>}{error && <p className="error" role="alert">{localizeError(error, language)}</p>}
   </section></Shell>;
 }
 
 function AnswerForm({ question, result, disabled, onAnswer }: { question: string; result: boolean | null; disabled: boolean; onAnswer: (answer: string, final: boolean) => void }) {
+  const { t } = useI18n();
   const [answer, setAnswer] = useState("");
   const input = useRef<HTMLInputElement>(null);
   const wasDisabled = useRef(disabled);
@@ -188,13 +266,14 @@ function AnswerForm({ question, result, disabled, onAnswer }: { question: string
     wasDisabled.current = disabled;
   }, [disabled]);
   return <form className={`answer ${result === true ? "correct" : result === false ? "wrong" : ""}`} onSubmit={(event) => { event.preventDefault(); if (!disabled && answer.trim()) onAnswer(answer, true); }}>
-    <input ref={input} autoFocus aria-disabled={disabled} value={answer} onChange={(e) => { const value = e.target.value; setAnswer(value); if (!disabled && value.trim()) onAnswer(value, false); }} placeholder={disabled ? "Get ready…" : "Type the country…"} autoComplete="off" />
-    <button disabled={disabled} className="primary">Submit</button>
+    <input ref={input} autoFocus aria-disabled={disabled} value={answer} onChange={(e) => { const value = e.target.value; setAnswer(value); if (!disabled && value.trim()) onAnswer(value, false); }} placeholder={disabled ? t("readyPlaceholder") : t("answerPlaceholder")} autoComplete="off" />
+    <button disabled={disabled} className="primary">{t("submit")}</button>
   </form>;
 }
 
 function Scoreboard({ room, playerId }: { room: RoomState; playerId: string }) {
-  return <div className="scoreboard">{room.players.map((player) => <div className={player.id === playerId ? "score me" : "score"} key={player.id}><span>{player.name}{!player.connected ? " · offline" : ""}</span><strong>{player.score}</strong></div>)}</div>;
+  const { t } = useI18n();
+  return <div className="scoreboard">{room.players.map((player) => <div className={player.id === playerId ? "score me" : "score"} key={player.id}><span>{player.name}{!player.connected ? ` · ${t("offlinePlayer")}` : ""}</span><strong>{player.score}</strong></div>)}</div>;
 }
 
 type TraceNode = { key: string; x: number; y: number; links: TraceNode[] };
@@ -368,7 +447,7 @@ function LegalPage({ type }: { type: "imprint" | "privacy" }) {
         {isImprint ? <ImprintContent /> : <PrivacyContent />}
       </article>
     </div>
-    <AppFooter />
+    <AppFooter legal />
   </main>;
 }
 
@@ -434,14 +513,17 @@ function PrivacyContent() {
   </div>;
 }
 
-function AppFooter() {
+function AppFooter({ legal = false }: { legal?: boolean }) {
+  const { language, t } = useI18n();
+  const copy = legal ? DE : language === "de" ? DE : EN;
   return <footer>
-    <span>Built for curious minds · Hexagons are bestagons.</span>
-    <span className="credits">Flaggen von <a href="https://flagpedia.net" target="_blank" rel="noreferrer">Flagpedia</a></span>
-    <span className="legal-links"><a href="/impressum">Impressum</a><span>·</span><a href="/datenschutz">Datenschutz</a></span>
+    <span>{legal ? copy.footer : t("footer")}</span>
+    <span className="credits">{legal ? copy.flagsBy : t("flagsBy")} <a href="https://flagpedia.net" target="_blank" rel="noreferrer">Flagpedia</a></span>
+    <span className="legal-links"><a href="/impressum">{copy.imprint}</a><span>·</span><a href="/datenschutz">{copy.privacy}</a></span>
   </footer>;
 }
 
-function Shell({ connection, children }: { connection: string; children: React.ReactNode }) {
-  return <main><HoneycombBackground /><nav><a href="/" className="brand"><span>FQ</span> Flag Quiz</a><span className={`status ${connection}`}>{connection}</span></nav><div className="layout">{children}</div><AppFooter /></main>;
+function Shell({ connection, children }: { connection: "connecting" | "online" | "offline"; children: React.ReactNode }) {
+  const { language, setLanguage, t } = useI18n();
+  return <main><HoneycombBackground /><nav><a href="/" className="brand"><span>FQ</span> Flag Quiz</a><div className="nav-meta"><button className="language-switch" onClick={() => setLanguage(language === "en" ? "de" : "en")} aria-label={`Switch to ${t("language")}`}>{language.toUpperCase()} / {t("language")}</button><span className={`status ${connection}`}>{t(connection)}</span></div></nav><div className="layout">{children}</div><AppFooter /></main>;
 }

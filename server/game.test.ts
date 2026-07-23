@@ -20,6 +20,8 @@ describe("answer matching", () => {
     expect(isAcceptedAnswer("con", "CG")).toBeFalse();
     expect(isAcceptedAnswer("Iran", "IQ")).toBeFalse();
     expect(isAcceptedAnswer("Iraq", "IQ")).toBeTrue();
+    expect(isAcceptedAnswer("Deutschland", "DE")).toBeTrue();
+    expect(isAcceptedAnswer("Vereinigte Staaten", "US")).toBeTrue();
   });
 });
 

@@ -16,6 +16,7 @@ before starting.
   - **World:** 196 country flags
   - **Expert:** 250 countries and territories
 - Tolerant answer matching with aliases, prefixes, accents, and one typo
+- English and German quiz interface with localized country answers
 - Reconnection by room and player name
 - QR join links
 - Responsive UI that preserves answer-field focus on mobile
@@ -160,6 +161,8 @@ temporary files to avoid retaining partial downloads.
 ## Answer matching
 
 Answers are normalized by removing accents, punctuation, whitespace, and case.
+English aliases come from `countryFlags.json`; German country and territory
+names are supplied by `Intl.DisplayNames` on the server.
 Matching is attempted in this order:
 
 1. exact alias

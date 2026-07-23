@@ -109,6 +109,9 @@ nav {
 .status.online::before { background: var(--lime); }
 .status.offline { color: var(--danger); }
 .status.offline::before { background: var(--danger); }
+.nav-meta { display: flex; align-items: center; gap: 22px; }
+.language-switch { padding: 7px 9px; color: var(--muted); background: transparent; border-color: var(--line-neutral); font: 9px var(--mono); text-transform: uppercase; letter-spacing: .06em; }
+.language-switch:not(:disabled):hover { color: var(--lime); border-color: var(--line-strong); transform: none; }
 
 .layout {
   flex: 1;
@@ -298,6 +301,8 @@ footer a:hover, .nav-back:hover { color: var(--lime); }
 
 @media (max-width: 760px) {
   nav { width: min(100% - 28px,1180px); min-height: 70px; }
+  .nav-meta { gap: 10px; }
+  .language-switch { padding: 6px 7px; }
   .layout { width: min(100% - 28px,1000px); grid-template-columns: 1fr; gap: 38px; padding: 42px 0 54px; }
   .hero { text-align: center; }
   .hero::after { right: 50%; transform: translateX(50%) rotate(8deg); opacity: .55; }
