@@ -14,6 +14,7 @@ export type RoomState = {
   targetScore?: number;
   durationSeconds?: number;
   countdownUntil?: number;
+  serverNow?: number;
   skipVotes?: number;
   skipVotesRequired?: number;
   hasVotedToSkip?: boolean;

@@ -190,6 +190,7 @@ export class GameServer {
         deadline: room.deadline, winnerIds: room.winnerIds,
         mode: room.mode, targetScore: room.targetScore, durationSeconds: room.durationSeconds,
         countdownUntil: room.phase === "playing" ? room.countdownUntil : undefined,
+        serverNow: Date.now(),
         question: room.phase === "playing" ? room.question : undefined,
         skipVotes: room.phase === "playing" ? room.skipVotes.size : undefined,
         skipVotesRequired: room.phase === "playing" ? [...room.players.values()].filter((player) => player.connected).length : undefined,

@@ -49,11 +49,15 @@ export default function App() {
 
   useEffect(() => {
     if (!room?.countdownUntil || room.phase !== "playing") { setCountdown(0); return; }
-    const update = () => setCountdown(Math.max(0, Math.ceil((room.countdownUntil! - Date.now()) / 1000)));
+    const clockOffset = Date.now() - (room.serverNow ?? Date.now());
+    const update = () => {
+      const estimatedServerNow = Date.now() - clockOffset;
+      setCountdown(Math.max(0, Math.ceil((room.countdownUntil! - estimatedServerNow) / 1000)));
+    };
     update();
     const timer = window.setInterval(update, 100);
     return () => window.clearInterval(timer);
-  }, [room?.countdownUntil, room?.phase]);
+  }, [room?.countdownUntil, room?.phase, room?.serverNow]);
 
   const send = useCallback((message: ClientMessage) => {
     if (socket.current?.readyState === WebSocket.OPEN) socket.current.send(JSON.stringify(message));
@@ -67,7 +71,8 @@ export default function App() {
       <section className="card lobby">
         <p className="eyebrow">Your game code</p>
         <button className="room-code" onClick={() => navigator.clipboard.writeText(room.roomCode)}>{room.roomCode}</button>
-        <p className="muted">Share this code with a friend. Tap it to copy.</p>
+        <p className="muted">Share this code or let a friend scan the QR code.</p>
+        <RoomQrCode roomCode={room.roomCode} />
         <div className="players">{room.players.map((player) => <span key={player.id}>🌍 {player.name}</span>)}</div>
         {room.ownerId === playerId
           ? <GameSettings disabled={room.players.length < 2} onStart={(settings) => send({ type: "start_game", ...settings })} />
@@ -100,6 +105,15 @@ export default function App() {
   </section></Shell>;
 }
 
+function RoomQrCode({ roomCode }: { roomCode: string }) {
+  const joinUrl = `${location.origin}${location.pathname}?room=${encodeURIComponent(roomCode)}`;
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&qzone=4&data=${encodeURIComponent(joinUrl)}`;
+  return <div className="room-qr">
+    <img src={qrUrl} width="180" height="180" alt={`QR code to join room ${roomCode}`} />
+    <button className="secondary" onClick={() => navigator.clipboard.writeText(joinUrl)}>Copy join link</button>
+  </div>;
+}
+
 function GameSettings({ disabled, onStart }: { disabled: boolean; onStart: (settings: { mode: GameMode; targetScore?: number; durationSeconds?: number }) => void }) {
   const [mode, setMode] = useState<GameMode>("first_to");
   const [targetScore, setTargetScore] = useState<number>(GAME_CONFIG.defaultTargetScore);
@@ -125,8 +139,15 @@ function Home({ connection, error, send }: { connection: string; error: string; 
 
 function AnswerForm({ question, result, disabled, onAnswer }: { question: string; result: boolean | null; disabled: boolean; onAnswer: (answer: string, final: boolean) => void }) {
   const [answer, setAnswer] = useState("");
-  useEffect(() => setAnswer(""), [question]);
-  return <form className={`answer ${result === true ? "correct" : result === false ? "wrong" : ""}`} onSubmit={(event) => { event.preventDefault(); if (!disabled && answer.trim()) onAnswer(answer, true); }}><input autoFocus disabled={disabled} value={answer} onChange={(e) => { const value = e.target.value; setAnswer(value); if (!disabled && value.trim()) onAnswer(value, false); }} placeholder={disabled ? "Get ready…" : "Type the country…"} autoComplete="off" /><button disabled={disabled} className="primary">Submit</button></form>;
+  const input = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    setAnswer("");
+    input.current?.focus({ preventScroll: true });
+  }, [question]);
+  return <form className={`answer ${result === true ? "correct" : result === false ? "wrong" : ""}`} onSubmit={(event) => { event.preventDefault(); if (!disabled && answer.trim()) onAnswer(answer, true); }}>
+    <input ref={input} autoFocus aria-disabled={disabled} value={answer} onChange={(e) => { const value = e.target.value; setAnswer(value); if (!disabled && value.trim()) onAnswer(value, false); }} placeholder={disabled ? "Get ready…" : "Type the country…"} autoComplete="off" />
+    <button disabled={disabled} className="primary">Submit</button>
+  </form>;
 }
 
 function Scoreboard({ room, playerId }: { room: RoomState; playerId: string }) {
