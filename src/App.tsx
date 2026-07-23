@@ -1,6 +1,6 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { GAME_CONFIG } from "./gameConfig";
-import type { ClientMessage, GameMode, RoomState, ServerMessage } from "./protocol";
+import type { ClientMessage, Difficulty, GameMode, RoomState, ServerMessage } from "./protocol";
 
 const websocketUrl = () => `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`;
 const flagImages = import.meta.glob("../node_modules/svg-country-flags/svg/*.svg", {
@@ -94,7 +94,7 @@ export default function App() {
   }
 
   return <Shell connection={connection}><section className="game">
-    <header className="game-header"><div><span className="eyebrow">Room {room.roomCode}</span><strong>{me?.score ?? 0} points {room.mode === "first_to" ? `/ ${room.targetScore}` : ""}</strong></div>{room.mode === "timed" && <div className={seconds <= 5 && room.deadline ? "timer urgent" : "timer"}>{room.deadline ? `${seconds}s` : "—"}</div>}</header>
+    <header className="game-header"><div><span className="eyebrow">Room {room.roomCode} / {room.difficulty ?? "world"}</span><strong>{me?.score ?? 0} points {room.mode === "first_to" ? `/ ${room.targetScore}` : ""}</strong></div>{room.mode === "timed" && <div className={seconds <= 5 && room.deadline ? "timer urgent" : "timer"}>{room.deadline ? `${seconds}s` : "—"}</div>}</header>
     <Scoreboard room={room} playerId={playerId} />
     <div className="flag-card"><img src={flagUrl(room.question)} alt="Flag to identify" />{countdown > 0 && <div className="countdown" aria-live="assertive"><span>{countdown}</span><small>Get ready</small></div>}</div>
     <AnswerForm disabled={countdown > 0} question={room.question ?? ""} result={answerResult} onAnswer={(answer, final) => send({ type: "answer", answer, question: room.question ?? "", final })} />
@@ -114,13 +114,24 @@ function RoomQrCode({ roomCode }: { roomCode: string }) {
   </div>;
 }
 
-function GameSettings({ disabled, onStart }: { disabled: boolean; onStart: (settings: { mode: GameMode; targetScore?: number; durationSeconds?: number }) => void }) {
+function GameSettings({ disabled, onStart }: { disabled: boolean; onStart: (settings: { mode: GameMode; difficulty: Difficulty; targetScore?: number; durationSeconds?: number }) => void }) {
   const [mode, setMode] = useState<GameMode>("first_to");
+  const [difficulty, setDifficulty] = useState<Difficulty>("world");
   const [targetScore, setTargetScore] = useState<number>(GAME_CONFIG.defaultTargetScore);
   const [durationSeconds, setDurationSeconds] = useState<number>(GAME_CONFIG.defaultDurationSeconds);
-  return <div className="game-settings"><div className="mode-picker"><button className={mode === "first_to" ? "selected" : ""} onClick={() => setMode("first_to")}>First to</button><button className={mode === "timed" ? "selected" : ""} onClick={() => setMode("timed")}>Time mode</button></div>
+  const difficultyCopy: Record<Difficulty, string> = {
+    explorer: "54 familiar flags",
+    world: "196 countries",
+    expert: "250 countries & territories",
+  };
+  return <div className="game-settings">
+    <div className="difficulty-picker" aria-label="Difficulty">
+      {(["explorer", "world", "expert"] as Difficulty[]).map((level) => <button key={level} className={difficulty === level ? "selected" : ""} onClick={() => setDifficulty(level)}>{level}</button>)}
+    </div>
+    <p className="setting-hint">{difficultyCopy[difficulty]}</p>
+    <div className="mode-picker"><button className={mode === "first_to" ? "selected" : ""} onClick={() => setMode("first_to")}>First to</button><button className={mode === "timed" ? "selected" : ""} onClick={() => setMode("timed")}>Time mode</button></div>
     <label>{mode === "first_to" ? "Points to win" : "Seconds"}<input type="number" min={mode === "first_to" ? GAME_CONFIG.minTargetScore : GAME_CONFIG.minDurationSeconds} max={mode === "first_to" ? GAME_CONFIG.maxTargetScore : GAME_CONFIG.maxDurationSeconds} value={mode === "first_to" ? targetScore : durationSeconds} onChange={(e) => mode === "first_to" ? setTargetScore(Number(e.target.value)) : setDurationSeconds(Number(e.target.value))} /></label>
-    <button className="primary" disabled={disabled} onClick={() => onStart({ mode, targetScore, durationSeconds })}>Start game</button>
+    <button className="primary" disabled={disabled} onClick={() => onStart({ mode, difficulty, targetScore, durationSeconds })}>Start game</button>
   </div>;
 }
 
@@ -128,7 +139,7 @@ function Home({ connection, error, send }: { connection: string; error: string; 
   const [name, setName] = useState("");
   const [code, setCode] = useState(new URLSearchParams(location.search).get("room")?.toUpperCase() ?? "");
   const submit = (event: FormEvent, type: "create" | "join") => { event.preventDefault(); send(type === "create" ? { type: "create_room", name } : { type: "join_room", name, roomCode: code }); };
-  return <Shell connection={connection}><section className="hero"><div className="globe">🌎</div><p className="eyebrow">Multiplayer · thirty seconds</p><h1>How well do you<br /><em>know the world?</em></h1><p className="lede">Race your friends to name as many flags as you can.</p></section><section className="card home-card">
+  return <Shell connection={connection}><section className="hero"><div className="globe">🌎</div><p className="eyebrow">Multiplayer / live session</p><h1>How well do you<br /><em>know the world?</em></h1><p className="lede">Race your friends through the world’s flags. One shared question, one synchronized countdown.</p></section><section className="card home-card">
     <label>Your name<input value={name} maxLength={24} autoComplete="nickname" onChange={(e) => setName(e.target.value)} placeholder="e.g. Tobias" /></label>
     <form onSubmit={(e) => submit(e, "create")}><button className="primary" disabled={!name.trim() || connection !== "online"}>Create a game</button></form>
     <div className="divider"><span>or join one</span></div>
@@ -155,5 +166,5 @@ function Scoreboard({ room, playerId }: { room: RoomState; playerId: string }) {
 }
 
 function Shell({ connection, children }: { connection: string; children: React.ReactNode }) {
-  return <main><nav><a href="/" className="brand"><span>🏳️</span> Flag Quiz</a><span className={`status ${connection}`}>{connection}</span></nav><div className="layout">{children}</div><footer>Built for curious minds and competitive friends.</footer></main>;
+  return <main><nav><a href="/" className="brand"><span>FQ</span> Flag Quiz</a><span className={`status ${connection}`}>{connection}</span></nav><div className="layout">{children}</div><footer>Built for curious minds · Hexagons are bestagons.</footer></main>;
 }

@@ -1,6 +1,7 @@
 import flags from "../src/res/countryFlags.json";
 import { GAME_CONFIG } from "../src/gameConfig";
-import type { ClientMessage, GameMode, Player, RoomState } from "../src/protocol";
+import { flagCodesForDifficulty } from "../src/flagPools";
+import type { ClientMessage, Difficulty, GameMode, Player, RoomState } from "../src/protocol";
 
 export const DEFAULT_ROUND_SECONDS = GAME_CONFIG.defaultDurationSeconds;
 export const DEFAULT_TARGET_SCORE = GAME_CONFIG.defaultTargetScore;
@@ -10,7 +11,7 @@ const ROOM_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
 export type SocketLike = { send(data: string): void };
 type InternalPlayer = Player & { socket: SocketLike };
-export type Room = { code: string; ownerId: string; phase: RoomState["phase"]; players: Map<string, InternalPlayer>; question?: string; remaining: string[]; skipVotes: Set<string>; deadline?: number; timer?: Timer; countdownTimer?: Timer; winnerIds?: string[]; mode?: GameMode; targetScore?: number; durationSeconds?: number; countdownUntil?: number };
+export type Room = { code: string; ownerId: string; phase: RoomState["phase"]; players: Map<string, InternalPlayer>; question?: string; remaining: string[]; skipVotes: Set<string>; deadline?: number; timer?: Timer; countdownTimer?: Timer; winnerIds?: string[]; mode?: GameMode; difficulty?: Difficulty; targetScore?: number; durationSeconds?: number; countdownUntil?: number };
 
 export class GameServer {
   readonly rooms = new Map<string, Room>();
@@ -23,7 +24,7 @@ export class GameServer {
     if (message.type === "join_room") return this.joinRoom(playerId, socket, message.name, message.roomCode);
     const room = this.roomFor(playerId);
     if (!room) return this.error(socket, "Create or join a room first.");
-    if (message.type === "start_game") return this.start(room, playerId, message.mode, message.targetScore, message.durationSeconds);
+    if (message.type === "start_game") return this.start(room, playerId, message.mode, message.difficulty, message.targetScore, message.durationSeconds);
     if (message.type === "answer") return this.answer(room, playerId, message.answer, message.question, message.final ?? false);
     if (message.type === "skip") return this.skip(room, playerId);
     if (message.type === "play_again") return this.reset(room, playerId);
@@ -84,17 +85,18 @@ export class GameServer {
     this.broadcast(room);
   }
 
-  private start(room: Room, playerId: string, mode: GameMode | undefined, rawTarget?: number, rawDuration?: number) {
+  private start(room: Room, playerId: string, mode: GameMode | undefined, difficulty: Difficulty | undefined, rawTarget?: number, rawDuration?: number) {
     const player = room.players.get(playerId)!;
     if (room.ownerId !== playerId) return this.error(player.socket, "Only the host can start the game.");
     if (room.players.size < 2) return this.error(player.socket, "At least two players are required.");
     room.phase = "playing";
     room.mode = mode === "timed" ? "timed" : "first_to";
+    room.difficulty = difficulty === "explorer" || difficulty === "expert" ? difficulty : "world";
     room.targetScore = clampInteger(rawTarget, DEFAULT_TARGET_SCORE, GAME_CONFIG.minTargetScore, GAME_CONFIG.maxTargetScore);
     room.durationSeconds = clampInteger(rawDuration, DEFAULT_ROUND_SECONDS, GAME_CONFIG.minDurationSeconds, GAME_CONFIG.maxDurationSeconds);
     room.deadline = undefined;
     room.winnerIds = undefined;
-    room.remaining = Object.keys(flags);
+    room.remaining = flagCodesForDifficulty(room.difficulty);
     room.skipVotes.clear();
     for (const participant of room.players.values()) {
       participant.score = 0;
@@ -149,7 +151,7 @@ export class GameServer {
   }
 
   private nextQuestion(room: Room) {
-    if (!room.remaining.length) room.remaining = Object.keys(flags);
+    if (!room.remaining.length) room.remaining = flagCodesForDifficulty(room.difficulty ?? "world");
     const index = Math.floor(this.random() * room.remaining.length);
     room.question = room.remaining.splice(index, 1)[0];
     room.skipVotes.clear();
@@ -188,7 +190,7 @@ export class GameServer {
         type: "state", roomCode: room.code, phase: room.phase, ownerId: room.ownerId,
         players: [...room.players.values()].map(({ id, name, score, connected }) => ({ id, name, score, connected })),
         deadline: room.deadline, winnerIds: room.winnerIds,
-        mode: room.mode, targetScore: room.targetScore, durationSeconds: room.durationSeconds,
+        mode: room.mode, difficulty: room.difficulty, targetScore: room.targetScore, durationSeconds: room.durationSeconds,
         countdownUntil: room.phase === "playing" ? room.countdownUntil : undefined,
         serverNow: Date.now(),
         question: room.phase === "playing" ? room.question : undefined,

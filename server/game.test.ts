@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { GameServer, isAcceptedAnswer, isAnswerCorrect, normalizeAnswer } from "./game";
+import { flagCodesForDifficulty } from "../src/flagPools";
 
 const socket = () => ({ messages: [] as any[], send(data: string) { this.messages.push(JSON.parse(data)); } });
 
@@ -19,6 +20,15 @@ describe("answer matching", () => {
     expect(isAcceptedAnswer("con", "CG")).toBeFalse();
     expect(isAcceptedAnswer("Iran", "IQ")).toBeFalse();
     expect(isAcceptedAnswer("Iraq", "IQ")).toBeTrue();
+  });
+});
+
+describe("difficulty", () => {
+  test("keeps territories in expert mode only", () => {
+    expect(flagCodesForDifficulty("explorer").length).toBe(54);
+    expect(flagCodesForDifficulty("world")).not.toContain("AI");
+    expect(flagCodesForDifficulty("expert")).toContain("AI");
+    expect(isAcceptedAnswer("Anguilla", "AI")).toBeTrue();
   });
 });
 
