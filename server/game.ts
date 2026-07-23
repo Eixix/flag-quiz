@@ -1,6 +1,8 @@
 import flags from "../src/res/countryFlags.json";
 import { GAME_CONFIG } from "../src/gameConfig";
 import { flagCodesForDifficulty } from "../src/flagPools";
+import { DE_COUNTRY_NAMES } from "../src/i18n/countries/de";
+import { EN_COUNTRY_NAMES } from "../src/i18n/countries/en";
 import type { ClientMessage, Difficulty, GameMode, Player, RoomState } from "../src/protocol";
 
 export const DEFAULT_ROUND_SECONDS = GAME_CONFIG.defaultDurationSeconds;
@@ -8,7 +10,7 @@ export const DEFAULT_TARGET_SCORE = GAME_CONFIG.defaultTargetScore;
 export const COUNTDOWN_SECONDS = GAME_CONFIG.countdownSeconds;
 export const MAX_PLAYERS = 12;
 const ROOM_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-const germanRegionNames = new Intl.DisplayNames(["de"], { type: "region" });
+const COUNTRY_TRANSLATIONS = [EN_COUNTRY_NAMES, DE_COUNTRY_NAMES];
 
 /** Minimal interface shared by Bun WebSockets and lightweight test doubles. */
 export type SocketLike = { send(data: string): void };
@@ -262,14 +264,10 @@ export function isAcceptedAnswer(answer: string, countryCode: string) {
   if (!normalized || !(countryCode in flags)) return false;
 
   const matchingCountries = (matcher: (alias: string) => boolean) => new Set(
-    Object.entries(flags)
-      .filter(([code, aliases]) => {
-        // Intl supplies maintained German country and territory names without
-        // duplicating the complete answer dataset.
-        const germanName = germanRegionNames.of(code);
-        return [...aliases, ...(germanName ? [germanName] : [])].some((alias) => matcher(normalizeAnswer(alias)));
-      })
-      .map(([code]) => code),
+    Object.keys(flags)
+      .filter((code) => COUNTRY_TRANSLATIONS.some((translations) =>
+        (translations[code] ?? []).some((alias) => matcher(normalizeAnswer(alias))),
+      )),
   );
   const uniquelyMatchesCountry = (countries: Set<string>) => countries.size === 1 && countries.has(countryCode);
 

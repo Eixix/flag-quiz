@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { GameServer, isAcceptedAnswer, isAnswerCorrect, normalizeAnswer } from "./game";
 import { flagCodesForDifficulty } from "../src/flagPools";
+import { DE_COUNTRY_NAMES } from "../src/i18n/countries/de";
+import { EN_COUNTRY_NAMES } from "../src/i18n/countries/en";
 
 const socket = () => ({ messages: [] as any[], send(data: string) { this.messages.push(JSON.parse(data)); } });
 
@@ -31,6 +33,12 @@ describe("difficulty", () => {
     expect(flagCodesForDifficulty("world")).not.toContain("AI");
     expect(flagCodesForDifficulty("expert")).toContain("AI");
     expect(isAcceptedAnswer("Anguilla", "AI")).toBeTrue();
+  });
+});
+
+describe("translations", () => {
+  test("keeps every language aligned to the canonical country codes", () => {
+    expect(Object.keys(DE_COUNTRY_NAMES).sort()).toEqual(Object.keys(EN_COUNTRY_NAMES).sort());
   });
 });
 

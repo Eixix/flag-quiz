@@ -69,7 +69,10 @@ Important implementation choices:
 | `src/protocol.ts` | Shared client/server message contracts |
 | `src/gameConfig.ts` | Default values and allowed setting ranges |
 | `src/flagPools.ts` | Difficulty-to-flag-pool mapping |
-| `src/res/countryFlags.json` | ISO-like code to accepted-answer aliases |
+| `src/i18n/ui` | Per-language interface dictionaries |
+| `src/i18n/countries` | Per-language country and territory answer names |
+| `src/i18n/errors` | Localized server error messages |
+| `src/res/countryFlags.json` | Canonical English code and alias dataset |
 | `public/flags` | Locally served SVGs downloaded from FlagCDN |
 | `scripts/fetch-flags.mjs` | Validated, repeatable FlagCDN download script |
 | `src/styles.css` | Responsive visual system and component styling |
@@ -161,8 +164,9 @@ temporary files to avoid retaining partial downloads.
 ## Answer matching
 
 Answers are normalized by removing accents, punctuation, whitespace, and case.
-English aliases come from `countryFlags.json`; German country and territory
-names are supplied by `Intl.DisplayNames` on the server.
+English aliases and German country and territory names live in explicit modules
+under `src/i18n/countries`. The server searches every configured language, so
+players may answer in either language regardless of the selected interface.
 Matching is attempted in this order:
 
 1. exact alias

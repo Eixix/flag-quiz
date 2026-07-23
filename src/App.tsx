@@ -1,6 +1,9 @@
 import { createContext, FormEvent, useCallback, useContext, useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
 import { GAME_CONFIG } from "./gameConfig";
+import { DE_SERVER_ERRORS } from "./i18n/errors/de";
+import { DE_UI } from "./i18n/ui/de";
+import { EN_UI, type TranslationKey } from "./i18n/ui/en";
 import type { ClientMessage, Difficulty, GameMode, RoomState, ServerMessage } from "./protocol";
 
 const websocketUrl = () => `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`;
@@ -8,53 +11,10 @@ const websocketUrl = () => `${location.protocol === "https:" ? "wss" : "ws"}://$
 const flagUrl = (code?: string) => code ? `/flags/${code.toLowerCase()}.svg` : undefined;
 
 type Language = "en" | "de";
-const EN = {
-  online: "online", connecting: "connecting", offline: "offline",
-  gameCode: "Your game code", shareCode: "Share this code or let a friend scan the QR code.",
-  qrLoading: "QR code is being generated", copyLink: "Copy join link",
-  waitingHostStart: "Waiting for the host to start…", waitingHost: "Waiting for the host…",
-  startGame: "Start game", firstTo: "First to", timeMode: "Time mode",
-  pointsToWin: "Points to win", seconds: "Seconds", familiarFlags: "54 familiar flags",
-  countries: "196 countries", countriesTerritories: "250 countries & territories",
-  explorer: "Explorer", world: "World", expert: "Expert",
-  roundComplete: "Round complete", won: "You won!", goodGame: "Good game!", playAgain: "Play again",
-  room: "Room", points: "points", flagAlt: "Flag to identify", getReady: "Get ready",
-  waitingEveryone: "Waiting for everyone", voteSkip: "Vote to skip",
-  heroStatus: "Multiplayer / live session", heroTitle: "How well do you", heroAccent: "know the world?",
-  heroText: "Race your friends through the world’s flags. One shared question, one synchronized countdown.",
-  yourName: "Your name", namePlaceholder: "e.g. Tobias", createGame: "Create a game",
-  joinDivider: "or join one", roomCode: "ROOM CODE", join: "Join",
-  connectionLost: "Connection lost. Refresh to try again.", readyPlaceholder: "Get ready…",
-  answerPlaceholder: "Type the country…", submit: "Submit", offlinePlayer: "offline",
-  footer: "Built for curious minds · Hexagons are bestagons.", flagsBy: "Flags by",
-  imprint: "Imprint", privacy: "Privacy", language: "Deutsch",
-} as const;
-type TranslationKey = keyof typeof EN;
-const DE: Record<TranslationKey, string> = {
-  online: "online", connecting: "verbindet", offline: "offline",
-  gameCode: "Dein Spielcode", shareCode: "Teile diesen Code oder lass Freunde den QR-Code scannen.",
-  qrLoading: "QR-Code wird erstellt", copyLink: "Beitrittslink kopieren",
-  waitingHostStart: "Warte, bis der Host das Spiel startet…", waitingHost: "Warte auf den Host…",
-  startGame: "Spiel starten", firstTo: "Zuerst bei", timeMode: "Zeitmodus",
-  pointsToWin: "Punkte zum Sieg", seconds: "Sekunden", familiarFlags: "54 bekannte Flaggen",
-  countries: "196 Länder", countriesTerritories: "250 Länder & Gebiete",
-  explorer: "Entdecker", world: "Welt", expert: "Experte",
-  roundComplete: "Runde beendet", won: "Du hast gewonnen!", goodGame: "Gutes Spiel!", playAgain: "Nochmal spielen",
-  room: "Raum", points: "Punkte", flagAlt: "Zu erratende Flagge", getReady: "Mach dich bereit",
-  waitingEveryone: "Warte auf alle", voteSkip: "Überspringen",
-  heroStatus: "Mehrspieler / Live-Runde", heroTitle: "Wie gut kennst du", heroAccent: "die Welt?",
-  heroText: "Tritt gegen Freunde mit Flaggen aus aller Welt an. Eine gemeinsame Frage, ein synchroner Countdown.",
-  yourName: "Dein Name", namePlaceholder: "z. B. Tobias", createGame: "Spiel erstellen",
-  joinDivider: "oder beitreten", roomCode: "RAUMCODE", join: "Beitreten",
-  connectionLost: "Verbindung verloren. Aktualisiere die Seite.", readyPlaceholder: "Mach dich bereit…",
-  answerPlaceholder: "Land eingeben…", submit: "Absenden", offlinePlayer: "offline",
-  footer: "Für neugierige Köpfe · Hexagons are bestagons.", flagsBy: "Flaggen von",
-  imprint: "Impressum", privacy: "Datenschutz", language: "English",
-};
 const I18nContext = createContext({ language: "en" as Language, setLanguage: (_language: Language) => {} });
 function useI18n() {
   const { language, setLanguage } = useContext(I18nContext);
-  const copy = language === "de" ? DE : EN;
+  const copy = language === "de" ? DE_UI : EN_UI;
   return { language, setLanguage, t: (key: TranslationKey) => copy[key] };
 }
 
@@ -74,18 +34,7 @@ function LocalizedGame() {
   return <I18nContext.Provider value={{ language, setLanguage }}><GameApp /></I18nContext.Provider>;
 }
 
-const SERVER_ERRORS_DE: Record<string, string> = {
-  "Create or join a room first.": "Erstelle zuerst einen Raum oder tritt einem bei.",
-  "That room does not exist.": "Dieser Raum existiert nicht.",
-  "That game has already started.": "Dieses Spiel hat bereits begonnen.",
-  "That room is full.": "Dieser Raum ist voll.",
-  "Choose a different name.": "Wähle einen anderen Namen.",
-  "Only the host can start the game.": "Nur der Host kann das Spiel starten.",
-  "At least two players are required.": "Mindestens zwei Spieler werden benötigt.",
-  "Name must be between 2 and 24 characters.": "Der Name muss zwischen 2 und 24 Zeichen lang sein.",
-  "Invalid message.": "Ungültige Nachricht.",
-};
-const localizeError = (message: string, language: Language) => language === "de" ? SERVER_ERRORS_DE[message] ?? message : message;
+const localizeError = (message: string, language: Language) => language === "de" ? DE_SERVER_ERRORS[message] ?? message : message;
 
 function GameApp() {
   const { language, t } = useI18n();
@@ -515,7 +464,7 @@ function PrivacyContent() {
 
 function AppFooter({ legal = false }: { legal?: boolean }) {
   const { language, t } = useI18n();
-  const copy = legal ? DE : language === "de" ? DE : EN;
+  const copy = legal ? DE_UI : language === "de" ? DE_UI : EN_UI;
   return <footer>
     <span>{legal ? copy.footer : t("footer")}</span>
     <span className="credits">{legal ? copy.flagsBy : t("flagsBy")} <a href="https://flagpedia.net" target="_blank" rel="noreferrer">Flagpedia</a></span>
