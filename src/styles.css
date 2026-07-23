@@ -51,14 +51,29 @@ body::after {
   pointer-events: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='156' viewBox='0 0 180 156'%3E%3Cg fill='none' stroke='%23cfff46' stroke-width='1'%3E%3Cpath d='M45 0 90 26v52l-45 26L0 78V26zM135 0l45 26v52l-45 26-45-26V26zM0 78l45 26v52l-45 26-45-26v-52zM90 78l45 26v52l-45 26-45-26v-52zM180 78l45 26v52l-45 26-45-26v-52z'/%3E%3C/g%3E%3C/svg%3E");
   background-size: 180px 156px;
-  opacity: .07;
-  mask-image: radial-gradient(circle 420px at 88% 38%, black, transparent 78%);
+  opacity: calc(var(--honeycomb-opacity, 0) * var(--honeycomb-strength, .5));
+  -webkit-mask-image: radial-gradient(circle 245px at var(--mouse-x,50%) var(--mouse-y,50%),black 0,rgba(0,0,0,.68) 38%,transparent 78%);
+  mask-image: radial-gradient(circle 245px at var(--mouse-x,50%) var(--mouse-y,50%),black 0,rgba(0,0,0,.68) 38%,transparent 78%);
+  transition: opacity .22s ease;
 }
 button, input { font: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: .38; }
 
 main { position: relative; z-index: 1; min-height: 100vh; display: flex; flex-direction: column; }
+.honeycomb-traces {
+  position: fixed;
+  z-index: 0;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  opacity: calc(var(--honeycomb-opacity,0) * var(--trace-strength,.65));
+  -webkit-mask-image: radial-gradient(circle 225px at var(--mouse-x,50%) var(--mouse-y,50%),black 0,rgba(0,0,0,.8) 34%,transparent 74%);
+  mask-image: radial-gradient(circle 225px at var(--mouse-x,50%) var(--mouse-y,50%),black 0,rgba(0,0,0,.8) 34%,transparent 74%);
+  transition: opacity .22s ease;
+}
+nav, .layout, footer { position: relative; z-index: 1; }
 nav {
   display: flex;
   justify-content: space-between;
@@ -272,4 +287,9 @@ footer { width: min(1180px,calc(100% - 48px)); min-height: 76px; margin: auto; d
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+  .honeycomb-traces { display: none; }
+}
+
+@media (hover: none), (pointer: coarse) {
+  body::after, .honeycomb-traces { display: none; }
 }

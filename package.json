@@ -13,9 +13,9 @@
   },
   "dependencies": {
     "@vitejs/plugin-react": "^6.0.0",
+    "flag-icons": "^7.5.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "svg-country-flags": "^1.2.10",
     "vite": "^8.0.0"
   },
   "devDependencies": {

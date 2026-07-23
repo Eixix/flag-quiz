@@ -3,12 +3,12 @@ import { GAME_CONFIG } from "./gameConfig";
 import type { ClientMessage, Difficulty, GameMode, RoomState, ServerMessage } from "./protocol";
 
 const websocketUrl = () => `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`;
-const flagImages = import.meta.glob("../node_modules/svg-country-flags/svg/*.svg", {
+const flagImages = import.meta.glob("../node_modules/flag-icons/flags/4x3/*.svg", {
   eager: true,
   query: "?url",
   import: "default",
 }) as Record<string, string>;
-const flagUrl = (code?: string) => code ? flagImages[`../node_modules/svg-country-flags/svg/${code.toLowerCase()}.svg`] : undefined;
+const flagUrl = (code?: string) => code ? flagImages[`../node_modules/flag-icons/flags/4x3/${code.toLowerCase()}.svg`] : undefined;
 
 export default function App() {
   const socket = useRef<WebSocket | null>(null);
@@ -165,6 +165,135 @@ function Scoreboard({ room, playerId }: { room: RoomState; playerId: string }) {
   return <div className="scoreboard">{room.players.map((player) => <div className={player.id === playerId ? "score me" : "score"} key={player.id}><span>{player.name}{!player.connected ? " · offline" : ""}</span><strong>{player.score}</strong></div>)}</div>;
 }
 
+type TraceNode = { key: string; x: number; y: number; links: TraceNode[] };
+type TraceWalker = { from: TraceNode; to: TraceNode; progress: number; speed: number; length: number; alpha: number };
+
+function HoneycombBackground() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const context = canvas?.getContext("2d");
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const coarsePointer = window.matchMedia("(hover: none), (pointer: coarse)").matches;
+    if (!canvas || !context || reducedMotion || coarsePointer) return;
+
+    let nodes: TraceNode[] = [];
+    let walkers: TraceWalker[] = [];
+    let animationFrame = 0;
+    let pointerFrame = 0;
+    let previousTime = performance.now();
+
+    const createWalker = (): TraceWalker => {
+      const from = nodes[Math.floor(Math.random() * nodes.length)];
+      const to = from.links[Math.floor(Math.random() * from.links.length)];
+      return { from, to, progress: Math.random(), speed: 24 + Math.random() * 34, length: .12 + Math.random() * .2, alpha: .35 + Math.random() * .65 };
+    };
+
+    const buildGraph = () => {
+      const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.round(window.innerWidth * pixelRatio);
+      canvas.height = Math.round(window.innerHeight * pixelRatio);
+      context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+
+      const graphNodes = new Map<string, TraceNode>();
+      const edges = new Set<string>();
+      const addNode = (x: number, y: number) => {
+        const key = `${Math.round(x)},${Math.round(y)}`;
+        if (!graphNodes.has(key)) graphNodes.set(key, { key, x, y, links: [] });
+        return graphNodes.get(key)!;
+      };
+      const connect = (first: TraceNode, second: TraceNode) => {
+        const edgeKey = [first.key, second.key].sort().join("|");
+        if (edges.has(edgeKey)) return;
+        edges.add(edgeKey);
+        first.links.push(second);
+        second.links.push(first);
+      };
+
+      for (let row = -2; row <= Math.ceil(window.innerHeight / 78) + 2; row += 1) {
+        const centerY = 52 + row * 78;
+        const offsetX = row % 2 === 0 ? 45 : 0;
+        for (let centerX = offsetX - 180; centerX <= window.innerWidth + 180; centerX += 90) {
+          const points = [
+            [centerX, centerY - 52], [centerX + 45, centerY - 26],
+            [centerX + 45, centerY + 26], [centerX, centerY + 52],
+            [centerX - 45, centerY + 26], [centerX - 45, centerY - 26],
+          ].map(([x, y]) => addNode(x, y));
+          points.forEach((point, index) => connect(point, points[(index + 1) % points.length]));
+        }
+      }
+
+      nodes = [...graphNodes.values()].filter((node) => node.links.length > 1);
+      const walkerCount = Math.max(32, Math.round(window.innerWidth * window.innerHeight / 26000));
+      walkers = Array.from({ length: walkerCount }, createWalker);
+    };
+
+    const chooseNextNode = (walker: TraceWalker) => {
+      const arrived = walker.to;
+      let choices = arrived.links.filter((node) => node !== walker.from);
+      if (!choices.length || Math.random() < .08) choices = arrived.links;
+      walker.from = arrived;
+      walker.to = choices[Math.floor(Math.random() * choices.length)];
+      walker.progress = 0;
+      walker.speed = Math.max(20, Math.min(62, walker.speed + (Math.random() - .5) * 8));
+    };
+
+    const animate = (time: number) => {
+      const elapsed = Math.min((time - previousTime) / 1000, .05);
+      previousTime = time;
+      context.clearRect(0, 0, window.innerWidth, window.innerHeight);
+      context.lineCap = "round";
+
+      walkers.forEach((walker) => {
+        const edgeLength = Math.hypot(walker.to.x - walker.from.x, walker.to.y - walker.from.y);
+        walker.progress += (walker.speed * elapsed) / edgeLength;
+        if (walker.progress >= 1) chooseNextNode(walker);
+        const head = Math.min(walker.progress, 1);
+        const tail = Math.max(0, head - walker.length);
+        context.beginPath();
+        context.moveTo(walker.from.x + (walker.to.x - walker.from.x) * tail, walker.from.y + (walker.to.y - walker.from.y) * tail);
+        context.lineTo(walker.from.x + (walker.to.x - walker.from.x) * head, walker.from.y + (walker.to.y - walker.from.y) * head);
+        context.strokeStyle = `rgba(207, 255, 70, ${walker.alpha})`;
+        context.lineWidth = 1.4 + walker.alpha;
+        context.shadowColor = "rgba(207, 255, 70, .9)";
+        context.shadowBlur = 7;
+        context.stroke();
+      });
+      animationFrame = requestAnimationFrame(animate);
+    };
+
+    const handlePointerMove = (event: PointerEvent) => {
+      if (event.pointerType === "touch") return;
+      cancelAnimationFrame(pointerFrame);
+      pointerFrame = requestAnimationFrame(() => {
+        const overContent = document.elementFromPoint(event.clientX, event.clientY)?.closest(".hero, .card, .game, nav, footer");
+        document.documentElement.style.setProperty("--mouse-x", `${event.clientX}px`);
+        document.documentElement.style.setProperty("--mouse-y", `${event.clientY}px`);
+        document.documentElement.style.setProperty("--honeycomb-opacity", "1");
+        document.documentElement.style.setProperty("--honeycomb-strength", overContent ? ".18" : ".52");
+        document.documentElement.style.setProperty("--trace-strength", overContent ? ".25" : ".78");
+      });
+    };
+    const hideHoneycomb = () => document.documentElement.style.setProperty("--honeycomb-opacity", "0");
+
+    buildGraph();
+    animationFrame = requestAnimationFrame(animate);
+    window.addEventListener("resize", buildGraph);
+    document.addEventListener("pointermove", handlePointerMove);
+    document.documentElement.addEventListener("mouseleave", hideHoneycomb);
+    return () => {
+      cancelAnimationFrame(animationFrame);
+      cancelAnimationFrame(pointerFrame);
+      window.removeEventListener("resize", buildGraph);
+      document.removeEventListener("pointermove", handlePointerMove);
+      document.documentElement.removeEventListener("mouseleave", hideHoneycomb);
+    };
+  }, []);
+
+  return <canvas ref={canvasRef} className="honeycomb-traces" aria-hidden="true" />;
+}
+
 function Shell({ connection, children }: { connection: string; children: React.ReactNode }) {
-  return <main><nav><a href="/" className="brand"><span>FQ</span> Flag Quiz</a><span className={`status ${connection}`}>{connection}</span></nav><div className="layout">{children}</div><footer>Built for curious minds · Hexagons are bestagons.</footer></main>;
+  return <main><HoneycombBackground /><nav><a href="/" className="brand"><span>FQ</span> Flag Quiz</a><span className={`status ${connection}`}>{connection}</span></nav><div className="layout">{children}</div><footer>Built for curious minds · Hexagons are bestagons.</footer></main>;
 }
