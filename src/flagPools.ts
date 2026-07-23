@@ -19,6 +19,13 @@ const TERRITORY_CODES = new Set([
   "VI", "WF", "XK", "YT",
 ]);
 
+/**
+ * Returns a new question pool for a game.
+ *
+ * `world` deliberately excludes territories, while `expert` includes every
+ * answerable flag in the data file. Returning a new array lets the server
+ * remove questions without mutating the shared source data.
+ */
 export function flagCodesForDifficulty(difficulty: Difficulty) {
   const codes = Object.keys(flags);
   if (difficulty === "explorer") return codes.filter((code) => EXPLORER_CODES.has(code));

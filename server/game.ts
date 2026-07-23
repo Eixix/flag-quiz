@@ -9,16 +9,36 @@ export const COUNTDOWN_SECONDS = GAME_CONFIG.countdownSeconds;
 export const MAX_PLAYERS = 12;
 const ROOM_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
+/** Minimal interface shared by Bun WebSockets and lightweight test doubles. */
 export type SocketLike = { send(data: string): void };
 type InternalPlayer = Player & { socket: SocketLike };
-export type Room = { code: string; ownerId: string; phase: RoomState["phase"]; players: Map<string, InternalPlayer>; question?: string; remaining: string[]; skipVotes: Set<string>; deadline?: number; timer?: Timer; countdownTimer?: Timer; winnerIds?: string[]; mode?: GameMode; difficulty?: Difficulty; targetScore?: number; durationSeconds?: number; countdownUntil?: number };
+export type Room = {
+  code: string;
+  ownerId: string;
+  phase: RoomState["phase"];
+  players: Map<string, InternalPlayer>;
+  question?: string;
+  remaining: string[];
+  skipVotes: Set<string>;
+  deadline?: number;
+  timer?: Timer;
+  countdownTimer?: Timer;
+  winnerIds?: string[];
+  mode?: GameMode;
+  difficulty?: Difficulty;
+  targetScore?: number;
+  durationSeconds?: number;
+  countdownUntil?: number;
+};
 
+/** In-memory, server-authoritative room state machine. */
 export class GameServer {
   readonly rooms = new Map<string, Room>();
   private playerRooms = new Map<string, string>();
 
   constructor(private random = Math.random, private countdownSeconds: number = COUNTDOWN_SECONDS) {}
 
+  /** Dispatches a validated protocol message for one connected player. */
   handle(playerId: string, socket: SocketLike, message: ClientMessage) {
     if (message.type === "create_room") return this.createRoom(playerId, socket, message.name);
     if (message.type === "join_room") return this.joinRoom(playerId, socket, message.name, message.roomCode);
@@ -64,6 +84,7 @@ export class GameServer {
     if (!name) return;
     const room = this.rooms.get(rawCode.trim().toUpperCase());
     if (!room) return this.error(socket, "That room does not exist.");
+    // During a game, a matching disconnected name reclaims its score and role.
     const disconnected = [...room.players.values()].find((player) => !player.connected && player.name.toLowerCase() === name.toLowerCase());
     if (disconnected) {
       const oldId = disconnected.id;
@@ -108,6 +129,7 @@ export class GameServer {
 
   private answer(room: Room, playerId: string, rawAnswer: string, question: string, final: boolean) {
     const player = room.players.get(playerId)!;
+    // The question token prevents a delayed answer from scoring on a new flag.
     if (room.phase !== "playing" || room.countdownUntil || !room.question || question !== room.question) return;
     const accepted = isAcceptedAnswer(rawAnswer, room.question);
     if (accepted || final) player.socket.send(JSON.stringify({ type: "answer", correct: accepted }));
@@ -186,6 +208,7 @@ export class GameServer {
 
   private broadcast(room: Room) {
     for (const viewer of room.players.values()) {
+      // Votes are public counts, but each viewer receives their own vote state.
       const state: RoomState = {
         type: "state", roomCode: room.code, phase: room.phase, ownerId: room.ownerId,
         players: [...room.players.values()].map(({ id, name, score, connected }) => ({ id, name, score, connected })),
@@ -217,6 +240,7 @@ export function normalizeAnswer(value: string) {
   return value.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
+/** Returns true when two normalized answers differ by at most one substitution. */
 export function isAnswerCorrect(answer: string, solution: string) {
   const left = normalizeAnswer(answer), right = normalizeAnswer(solution);
   if (!left || left.length !== right.length) return false;
@@ -225,6 +249,13 @@ export function isAnswerCorrect(answer: string, solution: string) {
   return true;
 }
 
+/**
+ * Matches an answer against all aliases while rejecting ambiguous results.
+ *
+ * Exact matches take priority, followed by a one-substitution tolerance and
+ * finally an unambiguous prefix. Insertions and deletions are not treated as
+ * typos because the normalized strings must have equal length.
+ */
 export function isAcceptedAnswer(answer: string, countryCode: string) {
   const normalized = normalizeAnswer(answer);
   if (!normalized || !(countryCode in flags)) return false;

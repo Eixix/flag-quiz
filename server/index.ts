@@ -7,6 +7,11 @@ const game = new GameServer();
 const dist = join(import.meta.dir, "../dist");
 const port = Number(Bun.env.PORT ?? 3000);
 
+/**
+ * One Bun process serves the production frontend and the authoritative
+ * WebSocket endpoint. Keeping both same-origin avoids separate CORS and
+ * WebSocket routing configuration.
+ */
 const server = Bun.serve<SocketData>({
   port,
   async fetch(request, server) {
@@ -16,6 +21,7 @@ const server = Bun.serve<SocketData>({
       const playerId = crypto.randomUUID();
       return server.upgrade(request, { data: { playerId } }) ? undefined : new Response("WebSocket upgrade failed", { status: 400 });
     }
+    // Unknown paths fall back to index.html for client-side navigation.
     const relativePath = url.pathname === "/" ? "index.html" : url.pathname.slice(1);
     let file = Bun.file(join(dist, relativePath));
     if (!(await file.exists())) file = Bun.file(join(dist, "index.html"));

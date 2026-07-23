@@ -1,4 +1,4 @@
-// Adjust game defaults and allowed ranges here.
+/** Host-facing defaults and server-enforced bounds for game settings. */
 export const GAME_CONFIG = {
   countdownSeconds: 3,
   defaultDurationSeconds: 60,
