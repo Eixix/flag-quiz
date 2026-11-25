@@ -20,16 +20,10 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+    # The homelab Anubis router is the only public entrypoint. Never expose a
+    # lower-priority backend router when Anubis stops or becomes unhealthy.
     labels:
-      - traefik.enable=true
-      - traefik.http.routers.flag-quiz.rule=Host(`${FLAG_DOMAIN:?Set FLAG_DOMAIN}`)
-      - traefik.http.routers.flag-quiz.entrypoints=websecure
-      - traefik.http.routers.flag-quiz.priority=100
-      - traefik.http.routers.flag-quiz.tls=true
-      - traefik.http.routers.flag-quiz.tls.certresolver=externalresolver
-      - traefik.http.routers.flag-quiz.middlewares=security-headers@file
-      - traefik.http.services.flag-quiz.loadbalancer.server.port=3000
-      - traefik.docker.network=external_network
+      - traefik.enable=false
 
 networks:
   external_network:
